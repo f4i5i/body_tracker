@@ -195,6 +195,34 @@ header.top {
 .protein-tick { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--dim); font-size: 0.85rem; }
 .protein-tick input { width: 18px; height: 18px; accent-color: var(--fuel-1); }
 
+/* ---------- calorie bar ---------- */
+.calbar { background: var(--srf); border: 1px solid var(--edge); border-radius: 14px; padding: 10px 14px; margin: 10px 0 2px; box-shadow: var(--shadow); }
+.calbar .cb-row { display: flex; align-items: baseline; gap: 8px; }
+.calbar .cb-label { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+.calbar .cb-val { margin-left: auto; font-family: "Sora", sans-serif; font-weight: 800; font-size: 0.95rem; }
+.calbar .cb-val small { color: var(--faint); font-weight: 600; font-size: 0.7rem; }
+.calbar .cb-track { height: 7px; border-radius: 99px; background: var(--srf2); border: 1px solid var(--edge); margin-top: 7px; overflow: hidden; }
+.calbar .cb-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--fuel-2), var(--fuel-1)); transition: width 0.4s ease; }
+.calbar .cb-fill.over { background: linear-gradient(90deg, var(--iron-2), var(--iron-1)); }
+
+/* ---------- warm-up card ---------- */
+.warmcard { background: var(--srf); border: 1px solid var(--edge); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.warmcard.done { border-color: color-mix(in srgb, var(--fuel-1) 55%, var(--edge)); }
+.warmcard .wh { display: flex; align-items: center; gap: 10px; }
+.warmcard h3 { margin: 0; font-size: 0.95rem; flex: 1; }
+.warmcard ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: var(--dim); }
+.warmcard li { margin: 2px 0; }
+.warmtick { flex: none; width: 40px; height: 26px; border-radius: 999px; border: 1px solid var(--edge); background: var(--srf2);
+  display: grid; place-items: center; color: var(--faint); font-family: "Sora", sans-serif; font-size: 0.62rem; font-weight: 700; }
+.warmtick.on { background: linear-gradient(140deg, var(--fuel-1), var(--fuel-2)); color: #fff; border-color: transparent; }
+
+/* ---------- calc card ---------- */
+.calcrow { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.calcrow label { flex: none; width: 92px; font-size: 0.72rem; color: var(--dim); font-weight: 600; }
+.calcout { background: var(--srf2); border: 1px solid var(--edge); border-radius: 10px; padding: 9px 12px; margin: 10px 0;
+  font-size: 0.8rem; color: var(--dim); }
+.calcout b { font-family: "Sora", sans-serif; color: var(--ink); }
+
 /* ---------- FAB ---------- */
 .fab {
   position: fixed; right: max(18px, calc(50vw - 230px + 18px)); bottom: calc(88px + env(safe-area-inset-bottom));
@@ -397,7 +425,10 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
     </button>
   </header>
 
-  <main id="viewToday" class="screen"><div class="spine" id="spine"></div></main>
+  <main id="viewToday" class="screen">
+    <div class="calbar" id="calbar"></div>
+    <div class="spine" id="spine"></div>
+  </main>
 
   <main id="viewTrain" class="screen hidden"></main>
 
@@ -465,8 +496,29 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
   <div class="grab"></div>
   <h3 id="noteTitle">Note</h3>
   <textarea id="noteText" rows="3" placeholder="What did you actually eat? (optional)"></textarea>
+  <div style="height:10px"></div>
+  <div class="inline-in"><input class="num" id="noteKcal" type="number" inputmode="numeric" placeholder="kcal" aria-label="Calories override" style="width:110px;"><span style="color:var(--faint);font-size:0.8rem;" id="noteKcalHint">calories — leave empty for the plan default</span></div>
   <div style="height:12px"></div>
   <button class="btn fuelbtn" id="noteSave">Save note</button>
+</div>
+
+<div class="sheet" id="calcSheet" role="dialog" aria-label="Calorie target calculator">
+  <div class="grab"></div>
+  <h3>Calorie target calculator</h3>
+  <div class="calcrow"><label for="calcW">Weight kg</label><input class="num" id="calcW" type="number" inputmode="decimal" step="0.1"></div>
+  <div class="calcrow"><label for="calcAct">Activity</label><select id="calcAct">
+    <option value="1.375" selected>Light — desk job + training (matches the plan)</option>
+    <option value="1.55">Moderate — active job + training</option>
+    <option value="1.725">High — physical job + training</option>
+  </select></div>
+  <div class="calcrow"><label for="calcGoal">Goal</label><select id="calcGoal">
+    <option value="250" selected>Lean gain (+250)</option>
+    <option value="0">Maintain</option>
+    <option value="-300">Mini-cut (−300)</option>
+  </select></div>
+  <div class="calcout" id="calcOut">—</div>
+  <button class="btn fuelbtn" id="calcSave">Set as my target</button>
+  <p style="font-size:0.7rem;color:var(--faint);margin:10px 0 0;">Estimate for a 35-year-old man, 183 cm. Big target changes are a coach + doctor conversation, not an app setting.</p>
 </div>
 
 <div class="toast" id="toast">Saved</div>
@@ -484,12 +536,32 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catc
 
 /* ============ plan constants (mirror plan/ files) ============ */
 const MEALS = [
-  { id: "breakfast", t: "07:30", name: "Breakfast", sub: "3 eggs + 2 whites · 2 chapati · dahi · almonds" },
-  { id: "lunch",     t: "13:00", name: "Lunch",     sub: "protein of the day · daal · 2 chapati · salad" },
-  { id: "pre",       t: "16:30", name: "Pre-workout", sub: "apple/guava · dahi or whey · chai, no sugar" },
-  { id: "dinner",    t: "20:00", name: "Post-workout dinner", sub: "180 g protein · rice or chapati · sabzi" },
-  { id: "bed",       t: "22:15", name: "Before bed", sub: "milk/dahi + chia · 3 walnuts" }
+  { id: "breakfast", t: "07:30", name: "Breakfast", sub: "3 eggs + 2 whites · 2 chapati · dahi · almonds", kcal: 620 },
+  { id: "lunch",     t: "13:00", name: "Lunch",     sub: "protein of the day · daal · 2 chapati · salad", kcal: 700 },
+  { id: "pre",       t: "16:30", name: "Pre-workout", sub: "apple/guava · dahi or whey · chai, no sugar", kcal: 250 },
+  { id: "dinner",    t: "20:00", name: "Post-workout dinner", sub: "180 g protein · rice or chapati · sabzi", kcal: 680 },
+  { id: "bed",       t: "22:15", name: "Before bed", sub: "milk/dahi + chia · 3 walnuts", kcal: 300 }
 ];
+const WARMUPS = {
+  upper: ["2 min incline walk or bike — raise the heart rate", "10 arm circles each direction", "15 band pull-aparts", "10 scap push-ups", "Ramp-up on the first big lift: empty bar ×10 · 50% ×5 · 75% ×3 — then work sets"],
+  lower: ["3 min incline walk or bike", "10 leg swings each leg, front and side", "10 slow bodyweight squats", "10 glute bridges", "Ramp-up on the first big lift: empty bar ×10 · 50% ×5 · 75% ×3 — then work sets"],
+  pump: ["2 min bike or brisk walk", "10 arm circles each direction", "15 band pull-aparts", "First set of every cable move: light, ×15"],
+  cond: ["3 min easy walk", "10 leg swings each leg", "10 arm circles", "Round 1 at half effort — build into it"]
+};
+function warmupFor(session) {
+  if (session.startsWith("Upper")) return WARMUPS.upper;
+  if (session.startsWith("Lower")) return WARMUPS.lower;
+  if (session.startsWith("Pump")) return WARMUPS.pump;
+  if (session.startsWith("Conditioning")) return WARMUPS.cond;
+  return null;
+}
+function calSum(d) {
+  let c = 0;
+  for (const m of MEALS) { const st = d.meals[m.id]; if (st && st.done) c += (st.kcal != null ? st.kcal : m.kcal); }
+  if (d.snacks && d.snacks.kcal) c += d.snacks.kcal;
+  return c;
+}
+function calTarget() { return (store.settings.cal && store.settings.cal.target) || 2550; }
 const SESSIONS = ["Rest / easy walk", "Upper A — push", "Lower A — squat", "Pump day (optional)", "Upper B — pull", "Lower B — hinge", "Conditioning + core"];
 const PF_TIMES = ["AM", "PM", "Night"];
 
@@ -586,6 +658,7 @@ function day(k) {
   if (!store.days[k]) store.days[k] = { weight: null, sugar: [], meals: {}, meds: {}, workout: { done: false }, pf: [false, false, false], steps: null, sleep: null, water: null, energy: null, protein: false, notes: "" };
   const d = store.days[k];
   if (!d.pf) d.pf = [false, false, false];
+  if (!d.snacks) d.snacks = { kcal: null, note: "" };
   return d;
 }
 function dateOf(k) { const p = k.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
@@ -619,6 +692,7 @@ function buildItems(k) {
   for (const med of store.settings.meds)
     for (const t of med.times) items.push({ time: t, type: "med", med, doseKey: med.id + "@" + t });
   for (const r of d.sugar) items.push({ time: r.t, type: "sugar", r });
+  items.push({ time: "17:30", type: "snacks" });
   items.push({ time: "18:00", type: "workout" });
   items.push({ time: "21:30", type: "pf" });
   items.push({ time: "22:30", type: "dayclose" });
@@ -656,6 +730,17 @@ function renderSpine() {
   spineEl.innerHTML = html;
   bindSpine();
   updateHeader();
+  renderCalbar();
+}
+
+function renderCalbar() {
+  const d = day(viewDate);
+  const c = calSum(d), t = calTarget();
+  const pct = Math.min(100, Math.round(c / t * 100));
+  document.getElementById("calbar").innerHTML =
+    '<div class="cb-row"><span class="cb-label">Calories</span>' +
+    '<span class="cb-val num">' + c.toLocaleString() + ' <small>/ ' + t.toLocaleString() + ' kcal</small></span></div>' +
+    '<div class="cb-track"><div class="cb-fill ' + (c > t + 150 ? "over" : "") + '" style="width:' + pct + '%"></div></div>';
 }
 
 function nodeHTML(it, d) {
@@ -672,7 +757,8 @@ function nodeHTML(it, d) {
       '<button class="medal" aria-label="Mark ' + it.meal.name + '">' + (st.done ? IC.check : IC.meal) + '</button>' +
       '<div class="ncard"><div class="nrow"><span class="ntime">' + it.time + '</span><span class="ntitle">' + it.meal.name + '</span>' +
       '<span class="nact"><button class="notebtn ' + (note ? "hasnote" : "") + '" data-note="' + it.meal.id + '" aria-label="Add note">' + IC.pencil + '</button></span></div>' +
-      '<div class="nsub">' + (note ? "✎ " + note : it.meal.sub) + '</div></div></div>';
+      '<div class="nsub">' + (note ? "✎ " + note : it.meal.sub) +
+      ' · <span class="num">' + ((st.kcal != null ? st.kcal : it.meal.kcal)) + ' kcal</span></div></div></div>';
   }
   if (it.type === "med") {
     const taken = !!d.meds[it.doseKey];
@@ -709,6 +795,13 @@ function nodeHTML(it, d) {
       '<div class="medal">' + IC.wave + '</div>' +
       '<div class="ncard"><div class="nrow"><span class="ntime">3×/day</span><span class="ntitle">Pelvic floor</span><span class="nact ntime">' + n + '/3</span></div>' +
       '<div class="pfdots">' + dots + '</div></div></div>';
+  }
+  if (it.type === "snacks") {
+    const has = d.snacks.kcal != null && d.snacks.kcal > 0;
+    return '<div class="node fuel ' + (has ? "done" : "") + '" data-k="snacks">' +
+      '<div class="medal">' + IC.meal + '</div>' +
+      '<div class="ncard"><div class="nrow"><span class="ntime">any time</span><span class="ntitle">Snacks / extras</span></div>' +
+      '<div class="inline-in" style="margin-top:8px;"><input class="num" id="snackIn" type="number" inputmode="numeric" placeholder="0" value="' + (has ? d.snacks.kcal : "") + '" aria-label="Snack calories"><span style="color:var(--faint);font-size:0.8rem;">kcal outside planned meals — honesty box</span></div></div></div>';
   }
   if (it.type === "dayclose") {
     return '<div class="node gold ' + (d.sleep != null ? "done" : "") + '" data-k="close">' +
@@ -751,6 +844,8 @@ function bindSpine() {
   }));
   const wi = document.getElementById("weightIn");
   if (wi) wi.addEventListener("change", () => { d.weight = wi.value === "" ? null : +wi.value; save(); updateHeader(); });
+  const si = document.getElementById("snackIn");
+  if (si) si.addEventListener("change", () => { d.snacks.kcal = si.value === "" ? null : +si.value; save(); renderCalbar(); });
   spineEl.querySelectorAll("[data-stat]").forEach(inp => inp.addEventListener("change", () => {
     d[inp.dataset.stat] = inp.value === "" ? null : +inp.value; save(); updateHeader();
   }));
@@ -823,6 +918,13 @@ function renderTrain() {
   const doneCount = EXDB[s].filter(ex => (d.workout.sets[ex.n] || []).length >= targetSets(ex.t)).length;
   let html = '<div class="sesshead"><h2>' + s + '</h2><span class="count num">' + doneCount + '/' + EXDB[s].length + ' done · ' + totalSets + ' sets</span></div>' +
     '<p class="hint">Tap + after each set — weight stays filled for the next one. An exercise completes itself when you hit its target sets. Green dashed lines in the drawings are the position check.</p>';
+  const wu = warmupFor(s);
+  if (wu) {
+    html += '<div class="warmcard ' + (d.workout.warmup ? "done" : "") + '">' +
+      '<div class="wh"><h3>Warm-up — 5 min, never skipped</h3>' +
+      '<button class="warmtick ' + (d.workout.warmup ? "on" : "") + '" id="warmTick" aria-label="Mark warm-up done">' + (d.workout.warmup ? "✓" : "DO") + '</button></div>' +
+      '<ul>' + wu.map(x => "<li>" + x + "</li>").join("") + '</ul></div>';
+  }
   EXDB[s].forEach((ex, i) => {
     const sets = d.workout.sets[ex.n] || [];
     const target = targetSets(ex.t);
@@ -846,6 +948,8 @@ function renderTrain() {
       '<button class="addset" data-addset="' + i + '" aria-label="Add set">+</button></div></div></div>';
   });
   el.innerHTML = html;
+  const wt = document.getElementById("warmTick");
+  if (wt) wt.addEventListener("click", () => { d.workout.warmup = !d.workout.warmup; save(); renderTrain(); });
   el.querySelectorAll("[data-addset]").forEach(b => b.addEventListener("click", () => {
     const i = +b.dataset.addset; const ex = EXDB[s][i];
     const kg = el.querySelector('[data-kg="' + i + '"]').value;
@@ -901,6 +1005,13 @@ function renderTrends() {
     '<div class="tile"><div class="tl">Pelvic floor · 7 days</div><div class="tv num">' + pfDone + '<small>/ 21</small></div><div class="td">' + (pfDone >= 15 ? "good consistency" : "3 sessions daily") + '</div></div>' +
     '</div>';
 
+  const calDays = w7.map(k => store.days[k]).filter(d2 => d2 && calSum(d2) > 0);
+  const calAvg = calDays.length ? Math.round(avg(calDays.map(calSum))) : null;
+  html += '<div class="chartcard"><h3>Calories</h3><div class="chsub">tick meals on Today — plan defaults count automatically, override in the meal note</div>' +
+    '<div class="cb-row" style="display:flex;align-items:baseline;gap:8px;"><span class="tv num" style="font-family:Sora,sans-serif;font-weight:800;font-size:1.45rem;">' + (calAvg != null ? calAvg.toLocaleString() : "—") + '<small style="font-size:0.7rem;color:var(--faint);"> kcal · 7-day avg</small></span>' +
+    '<span style="margin-left:auto;font-size:0.75rem;color:var(--dim);">target <b class="num">' + calTarget().toLocaleString() + '</b></span></div>' +
+    '<button class="btn ghost" id="openCalc" style="margin-top:10px;">Recalculate my target</button></div>';
+
   html += sugarChartHTML() + weightChartHTML() + logbookHTML();
   el.innerHTML = html;
 
@@ -910,8 +1021,31 @@ function renderTrends() {
   el.querySelectorAll(".lbrow").forEach(b => b.addEventListener("click", () => {
     viewDate = b.dataset.day; switchTab("Today");
   }));
+  const oc = document.getElementById("openCalc");
+  if (oc) oc.addEventListener("click", () => {
+    const lastW = [...lastDays(14)].reverse().map(k => store.days[k] && store.days[k].weight).find(v => v != null);
+    document.getElementById("calcW").value = lastW || 72;
+    calcUpdate(); openSheet("calcSheet");
+  });
   bindChartTips(el);
 }
+
+function calcUpdate() {
+  const w = +document.getElementById("calcW").value || 72;
+  const act = +document.getElementById("calcAct").value;
+  const goal = +document.getElementById("calcGoal").value;
+  const bmr = Math.round(10 * w + 6.25 * 183 - 5 * 35 + 5);
+  const tdee = Math.round(bmr * act);
+  const target = Math.round((tdee + goal) / 10) * 10;
+  document.getElementById("calcOut").innerHTML =
+    'BMR <b class="num">' + bmr.toLocaleString() + '</b> · maintenance <b class="num">' + tdee.toLocaleString() + '</b> → target <b class="num">' + target.toLocaleString() + ' kcal</b> · protein <b class="num">' + Math.round(w * 2) + ' g</b>';
+  return target;
+}
+["calcW", "calcAct", "calcGoal"].forEach(id => document.getElementById(id).addEventListener("input", calcUpdate));
+document.getElementById("calcSave").addEventListener("click", () => {
+  store.settings.cal = { target: calcUpdate() };
+  save(); closeSheets(); renderTrends(); toast("Target updated");
+});
 
 function sugarChartHTML() {
   const keys = lastDays(sugarRange);
@@ -1115,8 +1249,11 @@ function exportDay(k) {
     fasting_sugar: fasting ? fasting.v : null,
     post_meal_sugar: posts.length ? posts[posts.length - 1].v : null,
     sugar_readings: d.sugar.map(r => ({ time: r.t, value: r.v, tag: r.tag })),
+    calories_kcal: calSum(d) || null,
+    calorie_target: calTarget(),
     workout: {
       done: d.workout.done,
+      warmup: !!d.workout.warmup,
       session: d.workout.session || sessionFor(k),
       top_lifts: Object.entries(d.workout.sets || {}).map(([exercise, sets]) => {
         const best = sets.reduce((a, s2) => (s2.kg || 0) >= (a.kg || 0) ? s2 : a, sets[0]);
@@ -1177,15 +1314,20 @@ let noteMeal = null;
 function openNote(id) {
   noteMeal = id;
   const m = MEALS.find(x => x.id === id);
+  const st = day(viewDate).meals[id] || {};
   document.getElementById("noteTitle").textContent = m.name + " — what you ate";
-  document.getElementById("noteText").value = (day(viewDate).meals[id] && day(viewDate).meals[id].note) || "";
+  document.getElementById("noteText").value = st.note || "";
+  document.getElementById("noteKcal").value = st.kcal != null ? st.kcal : "";
+  document.getElementById("noteKcalHint").textContent = "calories — empty = plan default (" + m.kcal + ")";
   openSheet("noteSheet");
 }
 document.getElementById("noteSave").addEventListener("click", () => {
   const d = day(viewDate);
   const st = d.meals[noteMeal] || (d.meals[noteMeal] = { done: false, note: "" });
   st.note = document.getElementById("noteText").value.trim();
-  save(); closeSheets(); renderSpine(); toast("Note saved");
+  const kv = document.getElementById("noteKcal").value;
+  st.kcal = kv === "" ? null : +kv;
+  save(); closeSheets(); renderSpine(); toast("Saved");
 });
 
 /* ============ toast / theme / init ============ */
