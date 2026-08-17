@@ -230,6 +230,15 @@ header.top {
   font-size: 0.8rem; color: var(--dim); }
 .calcout b { font-family: "Sora", sans-serif; color: var(--ink); }
 
+/* ---------- whatsapp ---------- */
+.wabtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  margin: 8px 0 0; padding: 10px; border-radius: 12px; font-family: "Sora", sans-serif; font-weight: 700; font-size: 0.82rem;
+  background: var(--srf); border: 1px solid var(--edge); color: #25D366; box-shadow: var(--shadow); }
+.wabtn:active { transform: scale(0.98); }
+#waPreview { font-size: 0.78rem; line-height: 1.5; min-height: 180px; }
+.wasend { background: linear-gradient(140deg, #35dd76, #1DA851) !important; }
+#waDaySeg button.on { background: linear-gradient(140deg, #35dd76, #1DA851); }
+
 /* ---------- FAB ---------- */
 .fab {
   position: fixed; right: max(18px, calc(50vw - 230px + 18px)); bottom: calc(88px + env(safe-area-inset-bottom));
@@ -434,6 +443,10 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
 
   <main id="viewToday" class="screen">
     <div class="calbar" id="calbar"></div>
+    <button class="wabtn" id="waOpen">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm5.4 14.1c-.2.7-1.3 1.3-1.9 1.4-.5.1-1.1.2-3.6-.8-3-1.2-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.9 2c.1.1.1.3 0 .5-.4.9-.9 1-.7 1.4.8 1.3 1.7 2.1 3 2.7.3.2.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l2.1 1c.3.2.5.3.6.4 0 .2 0 .6-.2 1.3z"/></svg>
+      Send meals to cook
+    </button>
     <div class="spine" id="spine"></div>
   </main>
 
@@ -512,6 +525,20 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
   <button class="btn fuelbtn" id="noteSave">Save note</button>
 </div>
 
+<div class="sheet" id="waSheet" role="dialog" aria-label="Send meal plan on WhatsApp">
+  <div class="grab"></div>
+  <h3>Meal plan → WhatsApp</h3>
+  <div class="seg" id="waDaySeg">
+    <button data-wd="0" class="on">Today</button>
+    <button data-wd="1">Tomorrow</button>
+  </div>
+  <textarea id="waPreview" rows="9" aria-label="Message preview — edit before sending"></textarea>
+  <div style="height:10px"></div>
+  <div class="inline-in"><input class="num" id="waNum" type="tel" inputmode="tel" placeholder="92300…" aria-label="Cook's WhatsApp number" style="width:150px;"><span style="color:var(--faint);font-size:0.75rem;">number with country code — optional, saved for next time</span></div>
+  <div style="height:12px"></div>
+  <button class="btn wasend" id="waSend">Open in WhatsApp</button>
+</div>
+
 <div class="sheet" id="calcSheet" role="dialog" aria-label="Calorie target calculator">
   <div class="grab"></div>
   <h3>Calorie target calculator</h3>
@@ -552,6 +579,27 @@ const MEALS = [
   { id: "dinner",    t: "20:00", name: "Post-workout dinner", sub: "180 g protein · rice or chapati · sabzi", kcal: 680 },
   { id: "bed",       t: "22:15", name: "Before bed", sub: "milk/dahi + chia · 3 walnuts", kcal: 300 }
 ];
+/* weekly protein rotation — mirrors plan/meals.md */
+const ROTATION = [
+  { l: "Free meal — aik plate, phir 20 min walk", d: "Normal dinner" },
+  { l: "Chicken curry (skinless) 150–180 g", d: "Fish (rahu/tilapia) 180 g, grilled ya kam tel mein" },
+  { l: "Beef/mutton karahi, lean 150–180 g", d: "Chicken tikka + salad" },
+  { l: "Chana 1 cup + 2 ublay anday", d: "Keema matar 180 g" },
+  { l: "Chicken breast grilled 150–180 g", d: "Daal masoor + 1 anda" },
+  { l: "Fish 150–180 g", d: "Chicken pulao — chawal 1 katori se zyada nahi" },
+  { l: "Beef seekh/chapli 150–180 g (oven/tawa, deep fry nahi)", d: "Chicken soup + chapati + anday" }
+];
+function mealMsg(k) {
+  const dt = dateOf(k);
+  const rot = ROTATION[dt.getDay()];
+  return "🍽 Khanay ka plan — " + DOWS[dt.getDay()] + " " + dt.getDate() + " " + MONTHS[dt.getMonth()] + "\n\n" +
+    "• Nashta (7:30): 3 anday + 2 safaidi ka omelette (piyaz, tamatar, palak) · 2 chapati · 1 cup dahi\n" +
+    "• Dopahar (1:00): " + rot.l + " · 1 cup daal ya chana · 2 chapati ya 1 katori chawal · salad (kheera, tamatar, piyaz, lemon)\n" +
+    "• Shaam (~4:30): 1 seb ya amrood · 1 cup dahi\n" +
+    "• Raat (8:00): " + rot.d + " · 1 katori chawal ya 2 chapati · paki sabzi (bhindi/karela/gobi/palak)\n" +
+    "• Sonay se pehle: 1 cup doodh ya dahi + chia/alsi seeds · 3 akhrot\n\n" +
+    "Yaad rahay: cheeni bilkul nahi · chapati whole-wheat atta · tel kam, ghee 1 chamach se zyada nahi · deep fry kuch nahi. Shukriya! 🙏";
+}
 const WARMUPS = {
   upper: ["2 min incline walk or bike — raise the heart rate", "10 arm circles each direction", "15 band pull-aparts", "10 scap push-ups", "Ramp-up on the first big lift: empty bar ×10 · 50% ×5 · 75% ×3 — then work sets"],
   lower: ["3 min incline walk or bike", "10 leg swings each leg, front and side", "10 slow bodyweight squats", "10 glute bridges", "Ramp-up on the first big lift: empty bar ×10 · 50% ×5 · 75% ×3 — then work sets"],
@@ -1324,6 +1372,32 @@ const scrim = document.getElementById("scrim");
 function openSheet(id) { scrim.classList.add("open"); document.getElementById(id).classList.add("open"); }
 function closeSheets() { scrim.classList.remove("open"); document.querySelectorAll(".sheet").forEach(s => s.classList.remove("open")); }
 scrim.addEventListener("click", closeSheets);
+
+/* whatsapp meal plan */
+let waDay = 0;
+function waFill() {
+  const dt = new Date(); dt.setDate(dt.getDate() + waDay);
+  document.getElementById("waPreview").value = mealMsg(dkey(dt));
+}
+document.getElementById("waOpen").addEventListener("click", () => {
+  waDay = 0;
+  document.querySelectorAll("#waDaySeg button").forEach(b => b.classList.toggle("on", b.dataset.wd === "0"));
+  waFill();
+  document.getElementById("waNum").value = store.settings.waCook || "";
+  openSheet("waSheet");
+});
+document.querySelectorAll("#waDaySeg button").forEach(b => b.addEventListener("click", () => {
+  waDay = +b.dataset.wd;
+  document.querySelectorAll("#waDaySeg button").forEach(x => x.classList.toggle("on", x === b));
+  waFill();
+}));
+document.getElementById("waSend").addEventListener("click", () => {
+  const num = document.getElementById("waNum").value.replace(/[^\d]/g, "");
+  if (num) { store.settings.waCook = num; save(); }
+  const url = "https://wa.me/" + (num ? num : "") + "?text=" + encodeURIComponent(document.getElementById("waPreview").value);
+  window.open(url, "_blank");
+  closeSheets();
+});
 
 let sugarTag = "fasting";
 document.getElementById("fabSugar").addEventListener("click", () => {
