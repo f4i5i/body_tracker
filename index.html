@@ -216,6 +216,13 @@ header.top {
   display: grid; place-items: center; color: var(--faint); font-family: "Sora", sans-serif; font-size: 0.62rem; font-weight: 700; }
 .warmtick.on { background: linear-gradient(140deg, var(--fuel-1), var(--fuel-2)); color: #fff; border-color: transparent; }
 
+/* ---------- food lookup ---------- */
+.foodres { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 168px; overflow-y: auto; }
+.foodres button { display: flex; align-items: baseline; gap: 8px; text-align: left; width: 100%;
+  background: var(--srf2); border: 1px solid var(--edge); border-radius: 9px; padding: 7px 11px; font-size: 0.82rem; }
+.foodres button .fp { color: var(--faint); font-size: 0.7rem; }
+.foodres button .fk { margin-left: auto; font-family: "Sora", sans-serif; font-weight: 700; color: var(--fuel-1); font-size: 0.78rem; white-space: nowrap; }
+
 /* ---------- calc card ---------- */
 .calcrow { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
 .calcrow label { flex: none; width: 92px; font-size: 0.72rem; color: var(--dim); font-weight: 600; }
@@ -498,6 +505,9 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
   <textarea id="noteText" rows="3" placeholder="What did you actually eat? (optional)"></textarea>
   <div style="height:10px"></div>
   <div class="inline-in"><input class="num" id="noteKcal" type="number" inputmode="numeric" placeholder="kcal" aria-label="Calories override" style="width:110px;"><span style="color:var(--faint);font-size:0.8rem;" id="noteKcalHint">calories — leave empty for the plan default</span></div>
+  <div style="height:10px"></div>
+  <input id="foodSearch" placeholder="Find a food… samosa, biryani, chai" aria-label="Search foods">
+  <div id="foodResults" class="foodres"></div>
   <div style="height:12px"></div>
   <button class="btn fuelbtn" id="noteSave">Save note</button>
 </div>
@@ -562,6 +572,25 @@ function calSum(d) {
   return c;
 }
 function calTarget() { return (store.settings.cal && store.settings.cal.target) || 2550; }
+
+/* offline food lookup — desi portions, approximate kcal */
+const FOODDB = [
+  ["Chapati / roti, medium", "1", 120], ["Naan", "1", 260], ["Paratha", "1", 320], ["Halwa puri", "1 plate", 650],
+  ["White rice", "1 katori", 200], ["Brown rice", "1 katori", 180], ["Biryani", "1 plate", 550], ["Pulao", "1 katori", 250],
+  ["Daal", "1 cup", 180], ["Chana", "1 cup", 270], ["Murgh cholay", "1 plate", 450],
+  ["Egg, boiled", "1", 80], ["Omelette", "2 eggs", 220], ["Chicken curry", "150 g", 240], ["Chicken tikka", "1 piece", 280],
+  ["Seekh kebab", "1", 150], ["Chapli kebab", "1", 300], ["Beef karahi", "1 cup", 400], ["Keema", "1 cup", 350],
+  ["Fish, fried", "150 g", 320], ["Fish, grilled", "150 g", 220], ["Nihari", "1 plate", 550], ["Haleem", "1 plate", 400],
+  ["Dahi", "1 cup", 100], ["Milk", "1 cup", 150], ["Lassi, sweet", "1 glass", 260], ["Raita", "1 katori", 80],
+  ["Chai, no sugar", "1 cup", 35], ["Chai with sugar", "1 cup", 90],
+  ["Samosa", "1", 260], ["Pakora", "100 g", 300], ["Spring roll", "1", 150], ["Paratha roll", "1", 450], ["Shawarma", "1", 450],
+  ["Burger", "1", 500], ["Pizza", "1 slice", 280], ["Fries", "small", 320], ["Bread", "1 slice", 70], ["Bun", "1", 150],
+  ["Jalebi", "100 g", 350], ["Gulab jamun", "1", 150], ["Barfi", "1 piece", 120], ["Kheer", "1 katori", 250], ["Halwa", "1 katori", 300],
+  ["Ice cream", "1 scoop", 140], ["Chocolate bar", "small", 250], ["Cold drink", "250 ml", 105], ["Packed juice", "250 ml", 120],
+  ["Apple", "1", 80], ["Banana", "1", 105], ["Mango", "1", 200], ["Guava", "1", 60], ["Orange", "1", 60], ["Dates", "3", 70],
+  ["Almonds", "10", 70], ["Walnuts", "3", 130], ["Peanuts", "50 g", 280],
+  ["Cooked sabzi", "1 katori", 120], ["Bhindi", "1 katori", 150], ["Alu curry", "1 katori", 200], ["Palak paneer", "1 katori", 280], ["Salad", "1 plate", 40]
+];
 const SESSIONS = ["Rest / easy walk", "Upper A — push", "Lower A — squat", "Pump day (optional)", "Upper B — pull", "Lower B — hinge", "Conditioning + core"];
 const PF_TIMES = ["AM", "PM", "Night"];
 
@@ -800,7 +829,9 @@ function nodeHTML(it, d) {
     const has = d.snacks.kcal != null && d.snacks.kcal > 0;
     return '<div class="node fuel ' + (has ? "done" : "") + '" data-k="snacks">' +
       '<div class="medal">' + IC.meal + '</div>' +
-      '<div class="ncard"><div class="nrow"><span class="ntime">any time</span><span class="ntitle">Snacks / extras</span></div>' +
+      '<div class="ncard"><div class="nrow"><span class="ntime">any time</span><span class="ntitle">Snacks / extras</span>' +
+      '<span class="nact"><button class="notebtn ' + (d.snacks.note ? "hasnote" : "") + '" data-note="snacks" aria-label="Find food calories">' + IC.pencil + '</button></span></div>' +
+      (d.snacks.note ? '<div class="nsub">✎ ' + esc(d.snacks.note) + '</div>' : "") +
       '<div class="inline-in" style="margin-top:8px;"><input class="num" id="snackIn" type="number" inputmode="numeric" placeholder="0" value="' + (has ? d.snacks.kcal : "") + '" aria-label="Snack calories"><span style="color:var(--faint);font-size:0.8rem;">kcal outside planned meals — honesty box</span></div></div></div>';
   }
   if (it.type === "dayclose") {
@@ -1313,21 +1344,48 @@ document.getElementById("sugarSave").addEventListener("click", () => {
 let noteMeal = null;
 function openNote(id) {
   noteMeal = id;
-  const m = MEALS.find(x => x.id === id);
-  const st = day(viewDate).meals[id] || {};
-  document.getElementById("noteTitle").textContent = m.name + " — what you ate";
+  const d = day(viewDate);
+  const isSnack = id === "snacks";
+  const m = isSnack ? null : MEALS.find(x => x.id === id);
+  const st = isSnack ? d.snacks : (d.meals[id] || {});
+  document.getElementById("noteTitle").textContent = isSnack ? "Snacks / extras — what was it" : m.name + " — what you ate";
   document.getElementById("noteText").value = st.note || "";
   document.getElementById("noteKcal").value = st.kcal != null ? st.kcal : "";
-  document.getElementById("noteKcalHint").textContent = "calories — empty = plan default (" + m.kcal + ")";
+  document.getElementById("noteKcalHint").textContent = isSnack ? "total snack calories — search below to add up" : "calories — empty = plan default (" + m.kcal + ")";
+  document.getElementById("foodSearch").value = "";
+  document.getElementById("foodResults").innerHTML = "";
   openSheet("noteSheet");
 }
 document.getElementById("noteSave").addEventListener("click", () => {
   const d = day(viewDate);
-  const st = d.meals[noteMeal] || (d.meals[noteMeal] = { done: false, note: "" });
-  st.note = document.getElementById("noteText").value.trim();
   const kv = document.getElementById("noteKcal").value;
-  st.kcal = kv === "" ? null : +kv;
+  const note = document.getElementById("noteText").value.trim();
+  if (noteMeal === "snacks") {
+    d.snacks = { kcal: kv === "" ? null : +kv, note };
+  } else {
+    const st = d.meals[noteMeal] || (d.meals[noteMeal] = { done: false, note: "" });
+    st.note = note; st.kcal = kv === "" ? null : +kv;
+  }
   save(); closeSheets(); renderSpine(); toast("Saved");
+});
+
+/* food search — adds picked items into the kcal field */
+document.getElementById("foodSearch").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  const box = document.getElementById("foodResults");
+  if (q.length < 2) { box.innerHTML = ""; return; }
+  const hits = FOODDB.filter(f => f[0].toLowerCase().includes(q)).slice(0, 8);
+  box.innerHTML = hits.length
+    ? hits.map((f, i) => '<button data-food="' + FOODDB.indexOf(f) + '"><span>' + f[0] + '</span><span class="fp">' + f[1] + '</span><span class="fk">+' + f[2] + ' kcal</span></button>').join("")
+    : '<div style="color:var(--faint);font-size:0.75rem;padding:6px 2px;">Nothing matched — type the kcal yourself, or ask your coach for an estimate.</div>';
+  box.querySelectorAll("[data-food]").forEach(b => b.addEventListener("click", () => {
+    const f = FOODDB[+b.dataset.food];
+    const ki = document.getElementById("noteKcal");
+    ki.value = (+ki.value || 0) + f[2];
+    const nt = document.getElementById("noteText");
+    nt.value = (nt.value ? nt.value + " · " : "") + f[0] + " (" + f[1] + ")";
+    e.target.value = ""; box.innerHTML = "";
+  }));
 });
 
 /* ============ toast / theme / init ============ */
