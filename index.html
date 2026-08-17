@@ -28,6 +28,7 @@
   --dim: #8A94A3;
   --faint: #566070;
 
+  --water-1: #56BBE8; --water-2: #2E7FA8;
   --fuel-1: #53C489;  --fuel-2: #1F7A4D;
   --iron-1: #F0985C;  --iron-2: #C25A21;
   --blood-1: #F2687C; --blood-2: #B93050;
@@ -49,6 +50,7 @@
     --ink: #171C23;
     --dim: #5D6774;
     --faint: #9AA4B0;
+    --water-1: #2E86B8; --water-2: #1F5F85;
     --thread: #D6DCE3;
     --shadow: 0 10px 26px rgba(23,28,35,0.10);
     --sheet-scrim: rgba(23,28,35,0.38);
@@ -64,6 +66,7 @@
   --ink: #171C23;
   --dim: #5D6774;
   --faint: #9AA4B0;
+  --water-1: #2E86B8; --water-2: #1F5F85;
   --thread: #D6DCE3;
   --shadow: 0 10px 26px rgba(23,28,35,0.10);
   --sheet-scrim: rgba(23,28,35,0.38);
@@ -204,6 +207,12 @@ header.top {
 .calbar .cb-track { height: 7px; border-radius: 99px; background: var(--srf2); border: 1px solid var(--edge); margin-top: 7px; overflow: hidden; }
 .calbar .cb-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--fuel-2), var(--fuel-1)); transition: width 0.4s ease; }
 .calbar .cb-fill.over { background: linear-gradient(90deg, var(--iron-2), var(--iron-1)); }
+.calbar .cb-fill.water { background: linear-gradient(90deg, var(--water-2), var(--water-1)); }
+.wctl { display: inline-flex; gap: 6px; margin-left: 10px; }
+.wctl button { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--srf2); border: 1px solid var(--edge); color: var(--water-1);
+  font-family: "Sora", sans-serif; font-weight: 800; font-size: 1rem; line-height: 1; }
+.wctl button:active { transform: scale(0.92); }
 
 /* ---------- warm-up card ---------- */
 .warmcard { background: var(--srf); border: 1px solid var(--edge); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
@@ -815,14 +824,29 @@ function renderSpine() {
   renderCalbar();
 }
 
+const WATER_TARGET = 3;   // litres, plan floor; glass = 250 ml
 function renderCalbar() {
   const d = day(viewDate);
   const c = calSum(d), t = calTarget();
   const pct = Math.min(100, Math.round(c / t * 100));
+  const w = d.water || 0;
+  const wpct = Math.min(100, Math.round(w / WATER_TARGET * 100));
   document.getElementById("calbar").innerHTML =
     '<div class="cb-row"><span class="cb-label">Calories</span>' +
     '<span class="cb-val num">' + c.toLocaleString() + ' <small>/ ' + t.toLocaleString() + ' kcal</small></span></div>' +
-    '<div class="cb-track"><div class="cb-fill ' + (c > t + 150 ? "over" : "") + '" style="width:' + pct + '%"></div></div>';
+    '<div class="cb-track"><div class="cb-fill ' + (c > t + 150 ? "over" : "") + '" style="width:' + pct + '%"></div></div>' +
+    '<div class="cb-row" style="margin-top:9px;"><span class="cb-label">Water</span>' +
+    '<span class="wctl"><button data-wgl="-1" aria-label="Remove a glass">−</button><button data-wgl="1" aria-label="Add a glass, 250 ml">+</button></span>' +
+    '<span class="cb-val num">' + (Math.round(w * 100) / 100) + ' <small>/ ' + WATER_TARGET + ' L · glass 250 ml</small></span></div>' +
+    '<div class="cb-track"><div class="cb-fill water" style="width:' + wpct + '%"></div></div>';
+  document.querySelectorAll("#calbar [data-wgl]").forEach(b => b.addEventListener("click", () => {
+    const d2 = day(viewDate);
+    d2.water = Math.max(0, Math.round(((d2.water || 0) + 0.25 * +b.dataset.wgl) * 100) / 100);
+    if (d2.water === 0) d2.water = null;
+    save(); renderCalbar();
+    const st = document.getElementById("st-water");
+    if (st) st.value = d2.water != null ? d2.water : "";
+  }));
 }
 
 function nodeHTML(it, d) {
@@ -932,6 +956,7 @@ function bindSpine() {
   if (si) si.addEventListener("change", () => { d.snacks.kcal = si.value === "" ? null : +si.value; save(); renderCalbar(); });
   spineEl.querySelectorAll("[data-stat]").forEach(inp => inp.addEventListener("change", () => {
     d[inp.dataset.stat] = inp.value === "" ? null : +inp.value; save(); updateHeader();
+    if (inp.dataset.stat === "water") renderCalbar();
   }));
   const pi = document.getElementById("proteinIn");
   if (pi) pi.addEventListener("change", () => { d.protein = pi.checked; save(); });
