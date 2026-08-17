@@ -1046,6 +1046,30 @@ function bindChartTips(el) {
   });
 }
 
+/* ============ native medicine alarms (Capacitor build only; no-op on web) ============ */
+function LN() { return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications; }
+async function syncMedAlarms() {
+  const ln = LN(); if (!ln) return;
+  try {
+    const perm = await ln.requestPermissions();
+    if (perm.display !== "granted") return;
+    const pending = await ln.getPending();
+    if (pending.notifications && pending.notifications.length)
+      await ln.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+    const notifs = []; let id = 1000;
+    for (const m of store.settings.meds) for (const t of m.times) {
+      const p = t.split(":");
+      notifs.push({
+        id: id++,
+        title: "Medicine — " + m.name,
+        body: (m.dose ? m.dose + " · " : "") + t + " dose. Tick it in BodyTrack when taken.",
+        schedule: { on: { hour: +p[0], minute: +p[1] }, allowWhileIdle: true }
+      });
+    }
+    if (notifs.length) await ln.schedule({ notifications: notifs });
+  } catch (e) {}
+}
+
 /* ============ meds screen ============ */
 function renderMeds() {
   const el = document.getElementById("medList");
@@ -1062,7 +1086,7 @@ function renderMeds() {
   el.querySelectorAll("[data-delmed]").forEach(b => b.addEventListener("click", () => {
     if (!confirm("Remove this medicine from tracking?")) return;
     store.settings.meds = store.settings.meds.filter(m => m.id !== b.dataset.delmed);
-    save(); renderMeds();
+    save(); renderMeds(); syncMedAlarms();
   }));
 }
 document.getElementById("medAdd").addEventListener("click", () => {
@@ -1073,7 +1097,7 @@ document.getElementById("medAdd").addEventListener("click", () => {
   store.settings.meds.push({ id: "m" + Date.now(), name, dose, times });
   save();
   document.getElementById("medName").value = ""; document.getElementById("medDose").value = ""; document.getElementById("medTimes").value = "";
-  renderMeds(); toast("Added — it's on today's spine");
+  renderMeds(); syncMedAlarms(); toast(LN() ? "Added — daily alarm set" : "Added — it's on today's spine");
 });
 
 /* ============ export ============ */
@@ -1183,6 +1207,7 @@ document.getElementById("themeBtn").addEventListener("click", () => {
 });
 applyTheme();
 renderSpine();
+syncMedAlarms();
 try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
 </script>
 </body>
