@@ -1,0 +1,12 @@
+{
+  "name": "BodyTrack",
+  "short_name": "BodyTrack",
+  "description": "Daily meals, blood sugar, workouts and medicine — tracked on your phone, shared only with your coach.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0E1116",
+  "theme_color": "#0E1116",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
