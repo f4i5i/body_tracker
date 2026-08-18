@@ -466,6 +466,7 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
   <main id="viewMeds" class="screen hidden">
     <h2>Medicine</h2>
     <p class="hint">Your list, your times. BodyTrack only records what was taken — doses and changes are between you and your doctor.</p>
+    <div id="alarmStatus"></div>
     <div id="medList"></div>
     <div class="card addform">
       <h3 style="margin:0 0 10px; font-size:0.95rem;">Add a medicine</h3>
@@ -1014,7 +1015,7 @@ function switchTab(name) {
   if (name === "Today") renderSpine();
   if (name === "Train") renderTrain();
   if (name === "Trends") renderTrends();
-  if (name === "Meds") renderMeds();
+  if (name === "Meds") { renderMeds(); renderAlarmStatus(); }
   if (name === "Export") renderExport();
   window.scrollTo(0, 0);
 }
@@ -1305,11 +1306,22 @@ function bindChartTips(el) {
 
 /* ============ native medicine alarms (Capacitor build only; no-op on web) ============ */
 function LN() { return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications; }
+let alarmState = { env: "web", perm: "-", exact: "-", scheduled: 0, err: "" };
+async function ensureChannel(ln) {
+  try { await ln.createChannel({ id: "meds", name: "Medicine alarms", description: "Daily medicine reminders", importance: 5, visibility: 1 }); } catch (e) {}
+}
 async function syncMedAlarms() {
-  const ln = LN(); if (!ln) return;
+  const ln = LN(); if (!ln) { alarmState.env = "web"; return; }
+  alarmState = { env: "app", perm: "-", exact: "-", scheduled: 0, err: "" };
   try {
-    const perm = await ln.requestPermissions();
+    let perm = await ln.checkPermissions();
+    if (perm.display !== "granted") perm = await ln.requestPermissions();
+    alarmState.perm = perm.display;
     if (perm.display !== "granted") return;
+    if (ln.checkExactNotificationSetting) {
+      try { alarmState.exact = (await ln.checkExactNotificationSetting()).exact_alarm; } catch (e) {}
+    }
+    await ensureChannel(ln);
     const pending = await ln.getPending();
     if (pending.notifications && pending.notifications.length)
       await ln.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
@@ -1320,11 +1332,47 @@ async function syncMedAlarms() {
         id: id++,
         title: "Medicine — " + m.name,
         body: (m.dose ? m.dose + " · " : "") + t + " dose. Tick it in BodyTrack when taken.",
+        channelId: "meds",
         schedule: { on: { hour: +p[0], minute: +p[1] }, allowWhileIdle: true }
       });
     }
     if (notifs.length) await ln.schedule({ notifications: notifs });
-  } catch (e) {}
+    alarmState.scheduled = notifs.length;
+  } catch (e) { alarmState.err = (e && e.message) || String(e); }
+  renderAlarmStatus();
+}
+async function testAlarm() {
+  const ln = LN(); if (!ln) return;
+  try {
+    await ensureChannel(ln);
+    await ln.schedule({ notifications: [{
+      id: 9999, title: "BodyTrack test alarm", body: "If you see this, alarms work. 💪",
+      channelId: "meds", schedule: { at: new Date(Date.now() + 60000), allowWhileIdle: true }
+    }] });
+    toast("Test alarm set — lock the phone, wait 1 minute");
+  } catch (e) { toast("Test failed: " + ((e && e.message) || e)); }
+}
+function renderAlarmStatus() {
+  const el = document.getElementById("alarmStatus"); if (!el) return;
+  if (alarmState.env === "web") {
+    el.innerHTML = '<div class="card"><b style="font-size:0.9rem;">Alarms: web version</b><p class="hint" style="margin:4px 0 0;">Reminders that fire with the app closed need the installed Android app (APK). This page only tracks.</p></div>';
+    return;
+  }
+  const ok = alarmState.perm === "granted" && !alarmState.err;
+  let rows = '<div><b style="font-size:0.9rem;">Alarms: ' + (ok ? (alarmState.scheduled + " scheduled ✓") : "problem found") + '</b></div>' +
+    '<p class="hint" style="margin:4px 0 8px;">Permission: <b>' + alarmState.perm + '</b>' +
+    (alarmState.exact !== "-" ? ' · Exact alarms: <b>' + alarmState.exact + '</b>' : "") +
+    (alarmState.err ? '<br>Error: ' + esc(alarmState.err) : "") + '</p>';
+  if (alarmState.perm !== "granted")
+    rows += '<button class="btn" id="alarmFix" style="margin-bottom:8px;">Enable notifications</button>' +
+      '<p class="hint">If no popup appears: Android Settings → Apps → BodyTrack → Notifications → Allow.</p>';
+  rows += '<button class="btn ghost" id="alarmTest">Send test alarm (1 min)</button>' +
+    '<p class="hint" style="margin-top:8px;"><b>Xiaomi/Redmi/Poco:</b> also needed once — Settings → Apps → Manage apps → BodyTrack → <b>Autostart ON</b> and Battery saver → <b>No restrictions</b>, otherwise MIUI kills alarms.</p>';
+  el.innerHTML = '<div class="card">' + rows + '</div>';
+  const fx = document.getElementById("alarmFix");
+  if (fx) fx.addEventListener("click", () => syncMedAlarms());
+  const ts = document.getElementById("alarmTest");
+  if (ts) ts.addEventListener("click", testAlarm);
 }
 
 /* ============ meds screen ============ */
