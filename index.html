@@ -638,7 +638,8 @@ const FOODDB = [
   ["Egg, boiled", "1", 80], ["Omelette", "2 eggs", 220], ["Chicken curry", "150 g", 240], ["Chicken tikka", "1 piece", 280],
   ["Seekh kebab", "1", 150], ["Chapli kebab", "1", 300], ["Beef karahi", "1 cup", 400], ["Keema", "1 cup", 350],
   ["Fish, fried", "150 g", 320], ["Fish, grilled", "150 g", 220], ["Nihari", "1 plate", 550], ["Haleem", "1 plate", 400],
-  ["Dahi", "1 cup", 100], ["Milk", "1 cup", 150], ["Lassi, sweet", "1 glass", 260], ["Raita", "1 katori", 80],
+  ["Dahi, unsweetened", "1 cup", 100, "dhai dahee yogurt curd"], ["Dahi, meethi (sweetened)", "1 cup", 180, "dhai sweet yogurt"],
+  ["Milk", "1 cup", 150, "doodh dudh"], ["Lassi, sweet", "1 glass", 260], ["Lassi, namkeen", "1 glass", 120], ["Raita", "1 katori", 80, "dhai raita"],
   ["Chai, no sugar", "1 cup", 35], ["Chai with sugar", "1 cup", 90],
   ["Samosa", "1", 260], ["Pakora", "100 g", 300], ["Spring roll", "1", 150], ["Paratha roll", "1", 450], ["Shawarma", "1", 450],
   ["Burger", "1", 500], ["Pizza", "1 slice", 280], ["Fries", "small", 320], ["Bread", "1 slice", 70], ["Bun", "1", 150],
@@ -1491,7 +1492,7 @@ document.getElementById("foodSearch").addEventListener("input", e => {
   const q = e.target.value.trim().toLowerCase();
   const box = document.getElementById("foodResults");
   if (q.length < 2) { box.innerHTML = ""; return; }
-  const hits = FOODDB.filter(f => f[0].toLowerCase().includes(q)).slice(0, 8);
+  const hits = FOODDB.filter(f => (f[0] + " " + (f[3] || "")).toLowerCase().includes(q)).slice(0, 8);
   box.innerHTML = hits.length
     ? hits.map((f, i) => '<button data-food="' + FOODDB.indexOf(f) + '"><span>' + f[0] + '</span><span class="fp">' + f[1] + '</span><span class="fk">+' + f[2] + ' kcal</span></button>').join("")
     : '<div style="color:var(--faint);font-size:0.75rem;padding:6px 2px;">Nothing matched — type the kcal yourself, or ask your coach for an estimate.</div>';
