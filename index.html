@@ -472,12 +472,14 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
     <div id="alarmStatus"></div>
     <div id="medList"></div>
     <div class="card addform">
-      <h3 style="margin:0 0 10px; font-size:0.95rem;">Add a medicine</h3>
+      <h3 style="margin:0 0 10px; font-size:0.95rem;" id="medFormTitle">Add a medicine</h3>
       <div class="frow"><input id="medName" placeholder="Name (e.g. Metformin)" aria-label="Medicine name"></div>
       <div class="frow"><input id="medDose" placeholder="Dose label (e.g. 500 mg) — optional" aria-label="Dose label"></div>
       <div class="frow"><input id="medTimes" placeholder="Times, comma separated (e.g. 08:00, 20:00)" aria-label="Times"></div>
       <div class="frow"><input id="medNote" placeholder="Instruction (optional) — e.g. khanay ke baad" aria-label="Instruction"></div>
       <button class="btn" id="medAdd">Add medicine</button>
+      <div style="height:8px"></div>
+      <button class="btn ghost hidden" id="medCancel">Cancel edit</button>
     </div>
   </main>
 
@@ -581,8 +583,25 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
 const KEY = "bodytrack.v1";
 const store = load();
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 1) return s; } catch (e) {}
-  return { v: 1, settings: { meds: [], theme: "auto" }, days: {} };
+  let s = null;
+  try { const raw = JSON.parse(localStorage.getItem(KEY)); if (raw && raw.v === 1) s = raw; } catch (e) {}
+  if (!s) s = { v: 1, settings: { meds: [], theme: "auto" }, days: {} };
+  // one-time seed of the prescribed regimen; times are placeholders — edit to the doctor's schedule
+  if (!s.settings.medSeedV1) {
+    const SEED = [
+      { name: "Tagipmet", dose: "50/500 mg", times: ["08:00", "20:00"], note: "khanay ke saath — set times to YOUR prescription" },
+      { name: "Methycobal", dose: "500 µg", times: ["08:00", "14:00", "20:00"], note: "set times to YOUR prescription" },
+      { name: "Evion", dose: "400 mg", times: ["08:00"], note: "" },
+      { name: "Vitrum", dose: "1 tablet", times: ["08:00"], note: "" }
+    ];
+    for (const sd of SEED) {
+      const first = sd.name.split(" ")[0].toLowerCase();
+      if (!s.settings.meds.some(m => m.name.toLowerCase().includes(first)))
+        s.settings.meds.push({ id: "m" + Math.floor(Math.random() * 1e9), ...sd });
+    }
+    s.settings.medSeedV1 = true;
+  }
+  return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 
@@ -1590,10 +1609,25 @@ function renderMeds() {
     '<div class="card"><div class="medrow"><div style="flex:1;"><div class="mname">' + esc(m.name) + '</div>' +
     ((m.dose || m.note) ? '<div class="mdose">' + esc([m.dose, m.note].filter(Boolean).join(" · ")) + '</div>' : "") +
     '<div class="timechips">' + m.times.map(t => '<span class="timechip num">' + t + '</span>').join("") + '</div></div>' +
+    '<button class="notebtn" data-editmed="' + m.id + '" aria-label="Edit ' + esc(m.name) + '">' + IC.pencil + '</button>' +
     '<button class="delbtn" data-delmed="' + m.id + '" aria-label="Remove ' + esc(m.name) + '">' + IC.x + '</button></div></div>'
   ).join("");
+  el.querySelectorAll("[data-editmed]").forEach(b => b.addEventListener("click", () => {
+    const m = store.settings.meds.find(x => x.id === b.dataset.editmed);
+    if (!m) return;
+    editingMedId = m.id;
+    document.getElementById("medName").value = m.name;
+    document.getElementById("medDose").value = m.dose || "";
+    document.getElementById("medTimes").value = m.times.join(", ");
+    document.getElementById("medNote").value = m.note || "";
+    document.getElementById("medFormTitle").textContent = "Edit " + m.name;
+    document.getElementById("medAdd").textContent = "Save changes";
+    document.getElementById("medCancel").classList.remove("hidden");
+    document.getElementById("medName").focus();
+  }));
   el.querySelectorAll("[data-delmed]").forEach(b => b.addEventListener("click", () => {
     if (!confirm("Remove this medicine from tracking?")) return;
+    if (editingMedId === b.dataset.delmed) medFormReset();
     store.settings.meds = store.settings.meds.filter(m => m.id !== b.dataset.delmed);
     save(); renderMeds(); syncMedAlarms();
   }));
@@ -1604,11 +1638,26 @@ document.getElementById("medAdd").addEventListener("click", () => {
   const note = document.getElementById("medNote").value.trim();
   const times = document.getElementById("medTimes").value.split(",").map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).map(s => s.padStart(5, "0")).sort();
   if (!name || !times.length) { toast("Need a name and at least one time like 08:00"); return; }
-  store.settings.meds.push({ id: "m" + Date.now(), name, dose, times, note });
-  save();
-  document.getElementById("medName").value = ""; document.getElementById("medDose").value = ""; document.getElementById("medTimes").value = ""; document.getElementById("medNote").value = "";
-  renderMeds(); syncMedAlarms(); toast(LN() ? "Added — daily alarm set" : "Added — it's on today's spine");
+  if (editingMedId) {
+    const m = store.settings.meds.find(x => x.id === editingMedId);
+    if (m) { m.name = name; m.dose = dose; m.times = times; m.note = note; }
+    toast(LN() ? "Updated — alarms rescheduled" : "Updated");
+  } else {
+    store.settings.meds.push({ id: "m" + Date.now(), name, dose, times, note });
+    toast(LN() ? "Added — daily alarm set" : "Added — it's on today's spine");
+  }
+  save(); medFormReset();
+  renderMeds(); syncMedAlarms();
 });
+let editingMedId = null;
+function medFormReset() {
+  editingMedId = null;
+  ["medName", "medDose", "medTimes", "medNote"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("medFormTitle").textContent = "Add a medicine";
+  document.getElementById("medAdd").textContent = "Add medicine";
+  document.getElementById("medCancel").classList.add("hidden");
+}
+document.getElementById("medCancel").addEventListener("click", medFormReset);
 
 /* ============ export ============ */
 function exportDay(k) {
