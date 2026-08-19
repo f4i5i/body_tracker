@@ -208,6 +208,9 @@ header.top {
 .calbar .cb-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--fuel-2), var(--fuel-1)); transition: width 0.4s ease; }
 .calbar .cb-fill.over { background: linear-gradient(90deg, var(--iron-2), var(--iron-1)); }
 .calbar .cb-fill.water { background: linear-gradient(90deg, var(--water-2), var(--water-1)); }
+.macrostrip { margin-top: 9px; font-size: 0.7rem; color: var(--faint); font-family: "Sora", sans-serif; font-weight: 600; }
+.macrostrip b { color: var(--ink); }
+.macrostrip b.hit { color: var(--fuel-1); }
 .wctl { display: inline-flex; gap: 6px; margin-left: 10px; }
 .wctl button { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
   background: var(--srf2); border: 1px solid var(--edge); color: var(--water-1);
@@ -527,10 +530,11 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
   <h3 id="noteTitle">Note</h3>
   <textarea id="noteText" rows="3" placeholder="What did you actually eat? (optional)"></textarea>
   <div style="height:10px"></div>
-  <div class="inline-in"><input class="num" id="noteKcal" type="number" inputmode="numeric" placeholder="kcal" aria-label="Calories override" style="width:110px;"><span style="color:var(--faint);font-size:0.8rem;" id="noteKcalHint">calories — leave empty for the plan default</span></div>
-  <div style="height:10px"></div>
-  <input id="foodSearch" placeholder="Find a food… samosa, biryani, chai" aria-label="Search foods">
+  <input id="foodSearch" placeholder="Find a food… chapati, daal, dhai" aria-label="Search foods">
   <div id="foodResults" class="foodres"></div>
+  <div class="setchips" id="itemChips" style="margin-top:10px;"></div>
+  <div style="height:6px"></div>
+  <div class="inline-in"><input class="num" id="noteKcal" type="number" inputmode="numeric" placeholder="kcal" aria-label="Extra calories" style="width:110px;"><span style="color:var(--faint);font-size:0.8rem;" id="noteKcalHint">extra kcal — for food not in the list</span></div>
   <div style="height:12px"></div>
   <button class="btn fuelbtn" id="noteSave">Save note</button>
 </div>
@@ -583,12 +587,13 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catc
 
 /* ============ plan constants (mirror plan/ files) ============ */
 const MEALS = [
-  { id: "breakfast", t: "07:30", name: "Breakfast", sub: "3 eggs + 2 whites · 2 chapati · dahi · almonds", kcal: 620 },
-  { id: "lunch",     t: "13:00", name: "Lunch",     sub: "protein of the day · daal · 2 chapati · salad", kcal: 700 },
-  { id: "pre",       t: "16:30", name: "Pre-workout", sub: "apple/guava · dahi or whey · chai, no sugar", kcal: 250 },
-  { id: "dinner",    t: "20:00", name: "Post-workout dinner", sub: "180 g protein · rice or chapati · sabzi", kcal: 680 },
-  { id: "bed",       t: "22:15", name: "Before bed", sub: "milk/dahi + chia · 3 walnuts", kcal: 300 }
+  { id: "breakfast", t: "07:30", name: "Breakfast", sub: "3 eggs + 2 whites · 2 chapati · dahi · almonds", kcal: 620, p: 38, c: 48, f: 30, fib: 7 },
+  { id: "lunch",     t: "13:00", name: "Lunch",     sub: "protein of the day · daal · 2 chapati · salad", kcal: 700, p: 45, c: 70, f: 22, fib: 12 },
+  { id: "pre",       t: "16:30", name: "Pre-workout", sub: "apple/guava · dahi or whey · chai, no sugar", kcal: 250, p: 10, c: 35, f: 6, fib: 4 },
+  { id: "dinner",    t: "20:00", name: "Post-workout dinner", sub: "180 g protein · rice or chapati · sabzi", kcal: 680, p: 48, c: 60, f: 20, fib: 8 },
+  { id: "bed",       t: "22:15", name: "Before bed", sub: "milk/dahi + chia · 3 walnuts", kcal: 300, p: 13, c: 20, f: 18, fib: 4 }
 ];
+const MACRO_TARGETS = { p: 150, c: 280, fib: 30 };
 /* weekly protein rotation — mirrors plan/meals.md */
 const ROTATION = [
   { l: "Free meal — aik plate, phir 20 min walk", d: "Normal dinner" },
@@ -623,51 +628,176 @@ function warmupFor(session) {
   if (session.startsWith("Conditioning")) return WARMUPS.cond;
   return null;
 }
+function itemsTotals(items) {
+  const t = { kcal: 0, p: 0, c: 0, f: 0, fib: 0 };
+  for (const it of items || []) {
+    const fd = FOODMAP[it.n]; if (!fd) continue;
+    t.kcal += fd[2] * it.q; t.p += fd[4] * it.q; t.c += fd[5] * it.q; t.f += fd[6] * it.q; t.fib += fd[7] * it.q;
+  }
+  return t;
+}
+function mealKcal(st, m) {
+  if (st && st.items && st.items.length) return Math.round(itemsTotals(st.items).kcal + (st.kcal || 0));
+  if (st && st.kcal != null) return st.kcal;
+  return m.kcal;
+}
+function itemsSummary(items) {
+  return (items || []).map(it => (it.q > 1 ? it.q + "× " : "") + it.n.split(/[,(]/)[0].trim()).join(", ");
+}
 function calSum(d) {
   let c = 0;
-  for (const m of MEALS) { const st = d.meals[m.id]; if (st && st.done) c += (st.kcal != null ? st.kcal : m.kcal); }
-  if (d.snacks && d.snacks.kcal) c += d.snacks.kcal;
+  for (const m of MEALS) { const st = d.meals[m.id]; if (st && st.done) c += mealKcal(st, m); }
+  if (d.snacks) c += Math.round(itemsTotals(d.snacks.items).kcal) + (d.snacks.kcal || 0);
   return c;
+}
+function dayMacros(d) {
+  const t = { p: 0, c: 0, f: 0, fib: 0 };
+  for (const m of MEALS) {
+    const st = d.meals[m.id]; if (!st || !st.done) continue;
+    if (st.items && st.items.length) {
+      const it = itemsTotals(st.items);
+      t.p += it.p; t.c += it.c; t.f += it.f; t.fib += it.fib;
+    } else { t.p += m.p; t.c += m.c; t.f += m.f; t.fib += m.fib; }
+  }
+  if (d.snacks && d.snacks.items) {
+    const it = itemsTotals(d.snacks.items);
+    t.p += it.p; t.c += it.c; t.f += it.f; t.fib += it.fib;
+  }
+  return t;
 }
 function calTarget() { return (store.settings.cal && store.settings.cal.target) || 2550; }
 
 /* offline food lookup — desi portions, approximate kcal */
 const FOODDB = [
-  ["Chapati / roti, medium", "1", 120], ["Naan", "1", 260], ["Paratha", "1", 320], ["Halwa puri", "1 plate", 650],
-  ["White rice", "1 katori", 200], ["Brown rice", "1 katori", 180], ["Biryani", "1 plate", 550], ["Pulao", "1 katori", 250],
-  ["Daal", "1 cup", 180], ["Chana", "1 cup", 270], ["Murgh cholay", "1 plate", 450],
-  ["Egg, boiled", "1", 80], ["Omelette", "2 eggs", 220], ["Chicken curry", "150 g", 240], ["Chicken tikka", "1 piece", 280],
-  ["Seekh kebab", "1", 150], ["Chapli kebab", "1", 300], ["Beef karahi", "1 cup", 400], ["Keema", "1 cup", 350],
-  ["Fish, fried", "150 g", 320], ["Fish, grilled", "150 g", 220], ["Nihari", "1 plate", 550], ["Haleem", "1 plate", 400],
-  ["Dahi, unsweetened", "1 cup", 100, "dhai dahee yogurt curd"], ["Dahi, meethi (sweetened)", "1 cup", 180, "dhai sweet yogurt"],
-  ["Milk", "1 cup", 150, "doodh dudh"], ["Lassi, sweet", "1 glass", 260], ["Lassi, namkeen", "1 glass", 120], ["Raita", "1 katori", 80, "dhai raita"],
-  ["Chai, no sugar", "1 cup", 35], ["Chai with sugar", "1 cup", 90],
-  ["Samosa", "1", 260], ["Pakora", "100 g", 300], ["Spring roll", "1", 150], ["Paratha roll", "1", 450], ["Shawarma", "1", 450],
-  ["Burger", "1", 500], ["Pizza", "1 slice", 280], ["Fries", "small", 320], ["Bread", "1 slice", 70], ["Bun", "1", 150],
-  ["Jalebi", "100 g", 350], ["Gulab jamun", "1", 150], ["Barfi", "1 piece", 120], ["Kheer", "1 katori", 250], ["Halwa", "1 katori", 300],
-  ["Ice cream", "1 scoop", 140], ["Chocolate bar", "small", 250], ["Cold drink", "250 ml", 105], ["Packed juice", "250 ml", 120],
-  ["Apple", "1", 80], ["Banana", "1", 105], ["Mango", "1", 200], ["Guava", "1", 60], ["Orange", "1", 60], ["Dates", "3", 70],
-  ["Almonds", "10", 70], ["Walnuts", "3", 130], ["Peanuts", "50 g", 280],
-  ["Cooked sabzi", "1 katori", 120], ["Bhindi", "1 katori", 150], ["Alu curry", "1 katori", 200], ["Palak paneer", "1 katori", 280], ["Salad", "1 plate", 40],
-  ["Chana chaat", "1 plate", 300], ["Dahi baray", "1 plate", 300], ["Papri chaat", "1 plate", 330], ["Aloo chaat", "1 plate", 250],
-  ["Fruit chaat", "1 katori", 150], ["Gol gappay", "6 pieces", 210], ["Bun kebab", "1", 350], ["Kachori", "1", 190],
-  ["Apple macaroni salad", "1 katori", 320], ["Russian salad", "1 katori", 280], ["Club sandwich", "1", 400], ["Chowmein", "1 plate", 450],
-  ["Chicken corn soup", "1 bowl", 150], ["Malai boti", "4 sticks", 350], ["Bhutta (corn)", "1", 130],
-  ["Kulfi", "1", 220], ["Falooda", "1 glass", 380], ["Sharbat (Rooh Afza)", "1 glass", 120], ["Sugarcane juice", "1 glass", 180],
-  ["Daal masoor", "1 cup", 180], ["Daal moong", "1 cup", 170], ["Daal mash (urad)", "1 cup", 210], ["Daal chana", "1 cup", 220],
-  ["Mixed daal", "1 cup", 190], ["Daal curry / shorba, thin", "1 cup", 150],
-  ["Multiseed / seed bread", "1 slice", 95], ["Brown / whole-wheat bread", "1 slice", 80], ["Roghni naan", "1", 380],
-  ["Pomegranate (anaar)", "1 cup", 130], ["Grapes", "1 cup", 100], ["Watermelon", "1 cup", 50], ["Melon (kharbooza)", "1 cup", 55],
-  ["Papaya", "1 cup", 60], ["Peach (aaroo)", "1", 60], ["Apricot (khubani)", "3", 50], ["Plum (aloo bukhara)", "2", 60],
-  ["Strawberries", "1 cup", 50], ["Kinnow", "1", 60], ["Pear (nashpati)", "1", 100], ["Chikoo", "1", 80], ["Lychee", "5", 60],
-  ["Palak / saag", "1 katori", 130], ["Sarson ka saag", "1 katori", 180], ["Aloo palak", "1 katori", 180], ["Aloo gobi", "1 katori", 180],
-  ["Baingan bharta", "1 katori", 180], ["Band gobi (cabbage) sabzi", "1 katori", 120], ["Green beans sabzi", "1 katori", 100],
-  ["Kaddu sabzi", "1 katori", 90], ["Matar (peas)", "half cup", 60],
-  ["Fresh salad / kachumber", "1 katori", 30], ["Grilled chicken salad", "1 plate", 280],
-  ["Kheera, raw", "1", 15], ["Tamatar, raw", "1", 20], ["Gaajar, raw", "1", 30], ["Mooli, raw", "1", 15],
-  ["Olive oil", "1 tbsp", 120], ["Mayonnaise", "1 tbsp", 90], ["Peanut butter", "1 tbsp", 95], ["Honey", "1 tbsp", 65],
-  ["Oats, dry", "half cup", 150]
+  // [name, portion, kcal, alias, protein_g, carbs_g, fat_g, fiber_g]
+  ["Chapati / roti, medium", "1", 120, "roti", 4, 24, 1, 3],
+  ["Naan", "1", 260, "", 9, 50, 3, 2],
+  ["Paratha", "1", 320, "", 6, 34, 18, 3],
+  ["Halwa puri", "1 plate", 650, "", 12, 80, 30, 5],
+  ["White rice", "1 katori", 200, "chawal", 4, 44, 0.5, 0.6],
+  ["Brown rice", "1 katori", 180, "chawal", 4, 38, 1.5, 3],
+  ["Biryani", "1 plate", 550, "", 25, 65, 20, 3],
+  ["Pulao", "1 katori", 250, "", 8, 38, 7, 2],
+  ["Daal", "1 cup", 180, "dal lentils", 9, 24, 5, 7],
+  ["Daal masoor", "1 cup", 180, "dal", 10, 26, 4, 7],
+  ["Daal moong", "1 cup", 170, "dal mung", 10, 25, 3.5, 7],
+  ["Daal mash (urad)", "1 cup", 210, "dal", 11, 26, 7, 6.5],
+  ["Daal chana", "1 cup", 220, "dal", 11, 30, 6.5, 9],
+  ["Mixed daal", "1 cup", 190, "dal", 10, 26, 5, 7.5],
+  ["Daal curry / shorba, thin", "1 cup", 150, "dal", 7, 20, 4, 5],
+  ["Chana", "1 cup", 270, "chickpeas cholay", 14, 40, 5, 11],
+  ["Murgh cholay", "1 plate", 450, "", 30, 40, 18, 9],
+  ["Egg, boiled", "1", 80, "anda", 6.5, 0.5, 5.5, 0],
+  ["Omelette", "2 eggs", 220, "anda", 13, 2, 17, 0],
+  ["Chicken curry", "150 g", 240, "murgh", 32, 4, 10, 1],
+  ["Chicken tikka", "1 piece", 280, "", 38, 3, 12, 0],
+  ["Seekh kebab", "1", 150, "", 10, 3, 11, 0],
+  ["Chapli kebab", "1", 300, "", 14, 8, 23, 1],
+  ["Beef karahi", "1 cup", 400, "", 30, 6, 28, 1],
+  ["Keema", "1 cup", 350, "qeema", 28, 6, 23, 1],
+  ["Fish, fried", "150 g", 320, "machli", 28, 10, 18, 0.5],
+  ["Fish, grilled", "150 g", 220, "machli", 32, 1, 9, 0],
+  ["Nihari", "1 plate", 550, "", 35, 15, 38, 1],
+  ["Haleem", "1 plate", 400, "", 25, 40, 15, 6],
+  ["Dahi, unsweetened", "1 cup", 100, "dhai dahee yogurt curd", 6, 8, 4.5, 0],
+  ["Dahi, meethi (sweetened)", "1 cup", 180, "dhai sweet yogurt", 6, 28, 4.5, 0],
+  ["Milk", "1 cup", 150, "doodh dudh", 8, 12, 8, 0],
+  ["Lassi, sweet", "1 glass", 260, "", 7, 45, 6, 0],
+  ["Lassi, namkeen", "1 glass", 120, "", 6, 9, 6, 0],
+  ["Raita", "1 katori", 80, "dhai raita", 4, 6, 4, 0.5],
+  ["Chai, no sugar", "1 cup", 35, "tea", 1.5, 3, 1.5, 0],
+  ["Chai with sugar", "1 cup", 90, "tea", 1.5, 16, 1.5, 0],
+  ["Samosa", "1", 260, "", 4, 28, 14, 2],
+  ["Pakora", "100 g", 300, "", 8, 28, 17, 4],
+  ["Spring roll", "1", 150, "", 4, 18, 7, 1],
+  ["Paratha roll", "1", 450, "", 22, 40, 22, 2],
+  ["Shawarma", "1", 450, "", 25, 40, 20, 3],
+  ["Burger", "1", 500, "", 25, 40, 25, 2],
+  ["Pizza", "1 slice", 280, "", 12, 30, 12, 2],
+  ["Fries", "small", 320, "chips", 4, 40, 16, 4],
+  ["Bread, white", "1 slice", 70, "double roti", 2.5, 13, 1, 0.7],
+  ["Multiseed / seed bread", "1 slice", 95, "", 4, 14, 2.8, 2.5],
+  ["Brown / whole-wheat bread", "1 slice", 80, "", 3.5, 14, 1.2, 2],
+  ["Roghni naan", "1", 380, "", 10, 55, 13, 2.5],
+  ["Bun", "1", 150, "", 5, 27, 2.5, 1],
+  ["Jalebi", "100 g", 350, "", 2, 55, 14, 0],
+  ["Gulab jamun", "1", 150, "", 2.5, 22, 6, 0],
+  ["Barfi", "1 piece", 120, "", 3, 15, 5.5, 0],
+  ["Kheer", "1 katori", 250, "", 7, 40, 7, 0.5],
+  ["Halwa", "1 katori", 300, "", 4, 40, 14, 1],
+  ["Ice cream", "1 scoop", 140, "", 2.5, 17, 7, 0],
+  ["Chocolate bar", "small", 250, "", 3, 28, 14, 1.5],
+  ["Cold drink", "250 ml", 105, "soda pepsi cola", 0, 27, 0, 0],
+  ["Packed juice", "250 ml", 120, "", 0.5, 29, 0, 0],
+  ["Apple", "1", 80, "seb", 0.5, 21, 0.3, 3.5],
+  ["Banana", "1", 105, "kela", 1.3, 27, 0.4, 3],
+  ["Mango", "1", 200, "aam", 2.8, 50, 1.3, 5],
+  ["Guava", "1", 60, "amrood", 2.5, 14, 1, 5],
+  ["Orange", "1", 60, "malta", 1.2, 15, 0.2, 3],
+  ["Kinnow", "1", 60, "", 1.2, 15, 0.3, 2.5],
+  ["Dates", "3", 70, "khajoor", 0.5, 18, 0, 1.6],
+  ["Pomegranate (anaar)", "1 cup", 130, "", 2.5, 29, 1.8, 6],
+  ["Grapes", "1 cup", 100, "angoor", 1, 27, 0.2, 1.4],
+  ["Watermelon", "1 cup", 50, "tarbooz", 1, 11.5, 0.2, 0.6],
+  ["Melon (kharbooza)", "1 cup", 55, "", 1.3, 13, 0.3, 1.4],
+  ["Papaya", "1 cup", 60, "", 0.7, 15, 0.4, 2.5],
+  ["Peach (aaroo)", "1", 60, "", 1.4, 14, 0.4, 2.3],
+  ["Apricot (khubani)", "3", 50, "", 1.4, 12, 0.4, 2],
+  ["Plum (aloo bukhara)", "2", 60, "", 0.9, 15, 0.4, 1.8],
+  ["Strawberries", "1 cup", 50, "", 1, 11.7, 0.5, 3],
+  ["Pear (nashpati)", "1", 100, "", 0.6, 27, 0.2, 5.5],
+  ["Chikoo", "1", 80, "sapodilla", 0.4, 20, 1, 5],
+  ["Lychee", "5", 60, "", 0.8, 15, 0.4, 1.2],
+  ["Almonds", "10", 70, "badam", 2.5, 2.5, 6, 1.5],
+  ["Walnuts", "3", 130, "akhrot", 3, 2.7, 13, 1.3],
+  ["Peanuts", "50 g", 280, "moongphali", 13, 8, 24, 4],
+  ["Cooked sabzi", "1 katori", 120, "vegetable", 3, 10, 8, 4],
+  ["Bhindi", "1 katori", 150, "okra", 3, 10, 11, 4.5],
+  ["Alu curry", "1 katori", 200, "aloo potato", 3, 28, 9, 3],
+  ["Palak paneer", "1 katori", 280, "", 12, 10, 22, 3.5],
+  ["Palak / saag", "1 katori", 130, "spinach", 5, 8, 9, 5],
+  ["Sarson ka saag", "1 katori", 180, "", 6, 10, 13, 6],
+  ["Aloo palak", "1 katori", 180, "", 5, 20, 10, 5],
+  ["Aloo gobi", "1 katori", 180, "", 4.5, 22, 9, 5],
+  ["Baingan bharta", "1 katori", 180, "eggplant", 3.5, 15, 12, 6],
+  ["Band gobi (cabbage) sabzi", "1 katori", 120, "", 3, 12, 7, 4],
+  ["Green beans sabzi", "1 katori", 100, "", 3, 10, 6, 4],
+  ["Kaddu sabzi", "1 katori", 90, "pumpkin", 2, 10, 5, 3],
+  ["Matar (peas)", "half cup", 60, "", 4, 10, 0.3, 4],
+  ["Salad", "1 plate", 40, "", 2, 8, 0.3, 3],
+  ["Fresh salad / kachumber", "1 katori", 30, "", 1.3, 6, 0.2, 2],
+  ["Grilled chicken salad", "1 plate", 280, "", 35, 8, 12, 3.5],
+  ["Kheera, raw", "1", 15, "cucumber", 0.7, 3.5, 0.1, 1],
+  ["Tamatar, raw", "1", 20, "tomato", 1, 4.5, 0.2, 1.4],
+  ["Gaajar, raw", "1", 30, "carrot", 0.7, 7, 0.2, 2],
+  ["Mooli, raw", "1", 15, "radish", 0.7, 3.5, 0.1, 1.6],
+  ["Chana chaat", "1 plate", 300, "", 12, 42, 9, 10],
+  ["Dahi baray", "1 plate", 300, "dhai bhalla", 10, 34, 14, 4],
+  ["Papri chaat", "1 plate", 330, "", 8, 40, 16, 4],
+  ["Aloo chaat", "1 plate", 250, "", 4, 40, 9, 4],
+  ["Fruit chaat", "1 katori", 150, "", 2, 36, 0.6, 5],
+  ["Gol gappay", "6 pieces", 210, "pani puri", 4, 36, 5, 2],
+  ["Bun kebab", "1", 350, "", 14, 38, 16, 2.5],
+  ["Kachori", "1", 190, "", 4, 21, 10, 1.5],
+  ["Apple macaroni salad", "1 katori", 320, "", 5, 30, 20, 2],
+  ["Russian salad", "1 katori", 280, "", 4, 22, 20, 2.5],
+  ["Club sandwich", "1", 400, "", 22, 36, 19, 2.5],
+  ["Chowmein", "1 plate", 450, "noodles", 16, 60, 16, 4],
+  ["Chicken corn soup", "1 bowl", 150, "", 10, 18, 4, 1.5],
+  ["Malai boti", "4 sticks", 350, "", 32, 6, 22, 0.5],
+  ["Bhutta (corn)", "1", 130, "challi", 4.5, 27, 1.6, 3.5],
+  ["Kulfi", "1", 220, "", 5, 22, 13, 0.3],
+  ["Falooda", "1 glass", 380, "", 7, 60, 12, 2],
+  ["Sharbat (Rooh Afza)", "1 glass", 120, "", 0, 30, 0, 0],
+  ["Sugarcane juice", "1 glass", 180, "ganne ka ras", 0, 45, 0, 0],
+  ["Olive oil", "1 tbsp", 120, "", 0, 0, 14, 0],
+  ["Mayonnaise", "1 tbsp", 90, "", 0.1, 0.6, 10, 0],
+  ["Peanut butter", "1 tbsp", 95, "", 4, 3.5, 8, 1],
+  ["Honey", "1 tbsp", 65, "shehad", 0, 17, 0, 0],
+  ["Oats, dry", "half cup", 150, "", 5, 27, 3, 4],
+  ["Whey protein", "1 scoop 30 g", 120, "", 24, 3, 1.5, 0]
 ];
+const FOODMAP = {}; FOODDB.forEach(f => { FOODMAP[f[0]] = f; });
 const SESSIONS = ["Rest / easy walk", "Upper A — push", "Lower A — squat", "Pump day (optional)", "Upper B — pull", "Lower B — hinge", "Conditioning + core"];
 const PF_TIMES = ["AM", "PM", "Night"];
 
@@ -765,6 +895,7 @@ function day(k) {
   const d = store.days[k];
   if (!d.pf) d.pf = [false, false, false];
   if (!d.snacks) d.snacks = { kcal: null, note: "" };
+  if (!d.snacks.items) d.snacks.items = [];
   return d;
 }
 function dateOf(k) { const p = k.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
@@ -853,7 +984,12 @@ function renderCalbar() {
     '<div class="cb-row" style="margin-top:9px;"><span class="cb-label">Water</span>' +
     '<span class="wctl"><button data-wgl="-1" aria-label="Remove a glass">−</button><button data-wgl="1" aria-label="Add a glass, 250 ml">+</button></span>' +
     '<span class="cb-val num">' + (Math.round(w * 100) / 100) + ' <small>/ ' + WATER_TARGET + ' L · glass 250 ml</small></span></div>' +
-    '<div class="cb-track"><div class="cb-fill water" style="width:' + wpct + '%"></div></div>';
+    '<div class="cb-track"><div class="cb-fill water" style="width:' + wpct + '%"></div></div>' +
+    (function () {
+      const mm = dayMacros(d);
+      if (!mm.p && !mm.c && !mm.fib) return "";
+      return '<div class="macrostrip num">Protein <b class="' + (mm.p >= MACRO_TARGETS.p ? "hit" : "") + '">' + Math.round(mm.p) + '</b>/' + MACRO_TARGETS.p + ' g · Carbs <b>' + Math.round(mm.c) + '</b> g · Fat <b>' + Math.round(mm.f) + '</b> g · Fibre <b class="' + (mm.fib >= MACRO_TARGETS.fib ? "hit" : "") + '">' + Math.round(mm.fib) + '</b>/' + MACRO_TARGETS.fib + ' g</div>';
+    })();
   document.querySelectorAll("#calbar [data-wgl]").forEach(b => b.addEventListener("click", () => {
     const d2 = day(viewDate);
     d2.water = Math.max(0, Math.round(((d2.water || 0) + 0.25 * +b.dataset.wgl) * 100) / 100);
@@ -873,13 +1009,16 @@ function nodeHTML(it, d) {
   }
   if (it.type === "meal") {
     const st = d.meals[it.meal.id] || {};
+    const hasItems = st.items && st.items.length;
     const note = st.note ? esc(st.note) : "";
+    const desc = hasItems ? "🍽 " + esc(itemsSummary(st.items)) + (note ? " · ✎ " + note : "")
+      : note ? "✎ " + note : it.meal.sub;
     return '<div class="node fuel ' + (st.done ? "done" : "") + '" data-meal="' + it.meal.id + '">' +
       '<button class="medal" aria-label="Mark ' + it.meal.name + '">' + (st.done ? IC.check : IC.meal) + '</button>' +
       '<div class="ncard"><div class="nrow"><span class="ntime">' + it.time + '</span><span class="ntitle">' + it.meal.name + '</span>' +
-      '<span class="nact"><button class="notebtn ' + (note ? "hasnote" : "") + '" data-note="' + it.meal.id + '" aria-label="Add note">' + IC.pencil + '</button></span></div>' +
-      '<div class="nsub">' + (note ? "✎ " + note : it.meal.sub) +
-      ' · <span class="num">' + ((st.kcal != null ? st.kcal : it.meal.kcal)) + ' kcal</span></div></div></div>';
+      '<span class="nact"><button class="notebtn ' + ((note || hasItems) ? "hasnote" : "") + '" data-note="' + it.meal.id + '" aria-label="Log foods and notes">' + IC.pencil + '</button></span></div>' +
+      '<div class="nsub">' + desc +
+      ' · <span class="num">' + mealKcal(st, it.meal) + ' kcal</span></div></div></div>';
   }
   if (it.type === "med") {
     const taken = !!d.meds[it.doseKey];
@@ -918,13 +1057,18 @@ function nodeHTML(it, d) {
       '<div class="pfdots">' + dots + '</div></div></div>';
   }
   if (it.type === "snacks") {
-    const has = d.snacks.kcal != null && d.snacks.kcal > 0;
-    return '<div class="node fuel ' + (has ? "done" : "") + '" data-k="snacks">' +
+    const sn = d.snacks;
+    const hasItems = sn.items && sn.items.length;
+    const total = Math.round(itemsTotals(sn.items).kcal) + (sn.kcal || 0);
+    const desc = hasItems ? "🍽 " + esc(itemsSummary(sn.items)) + (sn.note ? " · ✎ " + esc(sn.note) : "")
+      : sn.note ? "✎ " + esc(sn.note) : "tap the pencil to find foods, or type extra kcal below";
+    return '<div class="node fuel ' + (total > 0 ? "done" : "") + '" data-k="snacks">' +
       '<div class="medal">' + IC.meal + '</div>' +
       '<div class="ncard"><div class="nrow"><span class="ntime">any time</span><span class="ntitle">Snacks / extras</span>' +
-      '<span class="nact"><button class="notebtn ' + (d.snacks.note ? "hasnote" : "") + '" data-note="snacks" aria-label="Find food calories">' + IC.pencil + '</button></span></div>' +
-      (d.snacks.note ? '<div class="nsub">✎ ' + esc(d.snacks.note) + '</div>' : "") +
-      '<div class="inline-in" style="margin-top:8px;"><input class="num" id="snackIn" type="number" inputmode="numeric" placeholder="0" value="' + (has ? d.snacks.kcal : "") + '" aria-label="Snack calories"><span style="color:var(--faint);font-size:0.8rem;">kcal outside planned meals — honesty box</span></div></div></div>';
+      (total > 0 ? '<span class="nact ntime">' + total + ' kcal</span>' : "") +
+      '<span class="nact" style="margin-left:' + (total > 0 ? '8px' : 'auto') + ';"><button class="notebtn ' + ((sn.note || hasItems) ? "hasnote" : "") + '" data-note="snacks" aria-label="Find food calories">' + IC.pencil + '</button></span></div>' +
+      '<div class="nsub">' + desc + '</div>' +
+      '<div class="inline-in" style="margin-top:8px;"><input class="num" id="snackIn" type="number" inputmode="numeric" placeholder="0" value="' + (sn.kcal || "") + '" aria-label="Extra snack calories"><span style="color:var(--faint);font-size:0.8rem;">extra kcal not found in the list</span></div></div></div>';
   }
   if (it.type === "dayclose") {
     return '<div class="node gold ' + (d.sleep != null ? "done" : "") + '" data-k="close">' +
@@ -1136,7 +1280,7 @@ function renderTrends() {
     '<span style="margin-left:auto;font-size:0.75rem;color:var(--dim);">target <b class="num">' + calTarget().toLocaleString() + '</b></span></div>' +
     '<button class="btn ghost" id="openCalc" style="margin-top:10px;">Recalculate my target</button></div>';
 
-  html += sugarChartHTML() + weightChartHTML() + logbookHTML();
+  html += sugarChartHTML() + weightChartHTML() + macroChartHTML() + logbookHTML();
   el.innerHTML = html;
 
   el.querySelectorAll(".rangeseg button").forEach(b => b.addEventListener("click", () => {
@@ -1262,6 +1406,39 @@ function weightChartHTML() {
     inner = s;
   }
   return '<div class="chartcard"><h3>Weight — 7-day average</h3><div class="chsub">dots are daily weigh-ins; the line is what matters · target +0.2–0.3 kg/week</div>' + inner + '<div class="chtip"></div></div>';
+}
+
+function macroChartHTML() {
+  const keys = lastDays(7);
+  const days = keys.map(k => {
+    const d = store.days[k];
+    return { k, m: d ? dayMacros(d) : null };
+  });
+  if (!days.some(x => x.m && (x.m.p || x.m.c))) return "";
+  function mini(label, get, target, color) {
+    const W = 130, H = 108, T = 10, B = 22, L = 6, R = 6;
+    const vals = days.map(x => x.m ? get(x.m) : 0);
+    const hi = Math.max(target * 1.25, ...vals) || 1;
+    const y = v => T + (hi - v) * (H - T - B) / hi;
+    const bw = (W - L - R) / 7 - 4;
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + label + ' per day, last 7 days">';
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(target) + '" y2="' + y(target) + '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.65"/>';
+    days.forEach((x, i) => {
+      const v = x.m ? get(x.m) : 0;
+      const bx = L + i * ((W - L - R) / 7) + 2;
+      if (v > 0) s += '<rect x="' + bx + '" y="' + y(v) + '" width="' + bw + '" height="' + Math.max(2, (H - B) - y(v)) + '" rx="3" fill="' + color + '" opacity="0.9"/>';
+      s += '<text x="' + (bx + bw / 2) + '" y="' + (H - 10) + '" text-anchor="middle" font-size="8" fill="var(--faint)" font-family="Sora,sans-serif" font-weight="600">' + dateOf(x.k).getDate() + '</text>';
+    });
+    s += '</svg>';
+    const today = days[6].m ? Math.round(get(days[6].m)) : 0;
+    return '<div style="flex:1;min-width:96px;"><div class="tl" style="font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:700;">' + label + ' <b class="num" style="color:var(--ink);">' + today + '</b><span style="color:var(--faint);">/' + target + ' g</span></div>' + s + '</div>';
+  }
+  return '<div class="chartcard"><h3>Macros — last 7 days</h3><div class="chsub">from logged foods; plan defaults count when a meal is only ticked · dashed line = daily target</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+    mini("Protein", m => m.p, MACRO_TARGETS.p, "var(--fuel-1)") +
+    mini("Carbs", m => m.c, MACRO_TARGETS.c, "var(--gold-1)") +
+    mini("Fibre", m => m.fib, MACRO_TARGETS.fib, "var(--meds-1)") +
+    '</div></div>';
 }
 
 function logbookHTML() {
@@ -1422,6 +1599,9 @@ function exportDay(k) {
     sugar_readings: d.sugar.map(r => ({ time: r.t, value: r.v, tag: r.tag })),
     calories_kcal: calSum(d) || null,
     calorie_target: calTarget(),
+    macros_g: (function () { const m = dayMacros(d); return { protein: Math.round(m.p), carbs: Math.round(m.c), fat: Math.round(m.f), fibre: Math.round(m.fib) }; })(),
+    foods: MEALS.flatMap(m => (d.meals[m.id] && d.meals[m.id].items) ? d.meals[m.id].items.map(it => it.q + "× " + it.n + " (" + m.name + ")") : [])
+      .concat((d.snacks.items || []).map(it => it.q + "× " + it.n + " (snack)")),
     workout: {
       done: d.workout.done,
       warmup: !!d.workout.warmup,
@@ -1508,48 +1688,73 @@ document.getElementById("sugarSave").addEventListener("click", () => {
 });
 
 let noteMeal = null;
+function noteTarget() {
+  const d = day(viewDate);
+  if (noteMeal === "snacks") return d.snacks;
+  return d.meals[noteMeal] || (d.meals[noteMeal] = { done: false, note: "", items: [] });
+}
+function renderItemChips() {
+  const st = noteTarget();
+  if (!st.items) st.items = [];
+  const box = document.getElementById("itemChips");
+  const tot = itemsTotals(st.items);
+  box.innerHTML = st.items.map((it, i) =>
+    '<span class="setchip num" style="background:linear-gradient(140deg,var(--fuel-1),var(--fuel-2));">' +
+    '<button data-idec="' + i + '" aria-label="One less">−</button>' +
+    it.n.split(/[,(]/)[0].trim() + " ×" + it.q +
+    '<button data-iinc="' + i + '" aria-label="One more">+</button></span>'
+  ).join("") + (st.items.length ? '<span class="setprog num" style="align-self:center;">= ' + Math.round(tot.kcal) + ' kcal · P' + Math.round(tot.p) + ' C' + Math.round(tot.c) + ' Fib' + Math.round(tot.fib) + '</span>' : "");
+  box.querySelectorAll("[data-iinc]").forEach(b => b.addEventListener("click", () => {
+    st.items[+b.dataset.iinc].q++; save(); renderItemChips();
+  }));
+  box.querySelectorAll("[data-idec]").forEach(b => b.addEventListener("click", () => {
+    const i = +b.dataset.idec;
+    st.items[i].q--;
+    if (st.items[i].q <= 0) st.items.splice(i, 1);
+    save(); renderItemChips();
+  }));
+}
 function openNote(id) {
   noteMeal = id;
-  const d = day(viewDate);
   const isSnack = id === "snacks";
   const m = isSnack ? null : MEALS.find(x => x.id === id);
-  const st = isSnack ? d.snacks : (d.meals[id] || {});
+  const st = noteTarget();
   document.getElementById("noteTitle").textContent = isSnack ? "Snacks / extras — what was it" : m.name + " — what you ate";
   document.getElementById("noteText").value = st.note || "";
   document.getElementById("noteKcal").value = st.kcal != null ? st.kcal : "";
-  document.getElementById("noteKcalHint").textContent = isSnack ? "total snack calories — search below to add up" : "calories — empty = plan default (" + m.kcal + ")";
+  document.getElementById("noteKcalHint").textContent = isSnack
+    ? "extra kcal — for food not in the list"
+    : (st.items && st.items.length ? "extra kcal on top of the items" : "extra kcal, or full override if no items picked (plan default " + m.kcal + ")");
   document.getElementById("foodSearch").value = "";
   document.getElementById("foodResults").innerHTML = "";
+  renderItemChips();
   openSheet("noteSheet");
 }
 document.getElementById("noteSave").addEventListener("click", () => {
-  const d = day(viewDate);
+  const st = noteTarget();
   const kv = document.getElementById("noteKcal").value;
-  const note = document.getElementById("noteText").value.trim();
-  if (noteMeal === "snacks") {
-    d.snacks = { kcal: kv === "" ? null : +kv, note };
-  } else {
-    const st = d.meals[noteMeal] || (d.meals[noteMeal] = { done: false, note: "" });
-    st.note = note; st.kcal = kv === "" ? null : +kv;
-  }
+  st.note = document.getElementById("noteText").value.trim();
+  st.kcal = kv === "" ? null : +kv;
+  if (noteMeal !== "snacks" && st.items && st.items.length && !st.done) st.done = true;
   save(); closeSheets(); renderSpine(); toast("Saved");
 });
 
-/* food search — adds picked items into the kcal field */
+/* food search — picked foods become quantity chips */
 document.getElementById("foodSearch").addEventListener("input", e => {
   const q = e.target.value.trim().toLowerCase();
   const box = document.getElementById("foodResults");
   if (q.length < 2) { box.innerHTML = ""; return; }
   const hits = FOODDB.filter(f => (f[0] + " " + (f[3] || "")).toLowerCase().includes(q)).slice(0, 8);
   box.innerHTML = hits.length
-    ? hits.map((f, i) => '<button data-food="' + FOODDB.indexOf(f) + '"><span>' + f[0] + '</span><span class="fp">' + f[1] + '</span><span class="fk">+' + f[2] + ' kcal</span></button>').join("")
-    : '<div style="color:var(--faint);font-size:0.75rem;padding:6px 2px;">Nothing matched — type the kcal yourself, or ask your coach for an estimate.</div>';
+    ? hits.map(f => '<button data-food="' + FOODDB.indexOf(f) + '"><span>' + f[0] + '</span><span class="fp">' + f[1] + '</span><span class="fk">+' + f[2] + ' kcal</span></button>').join("")
+    : '<div style="color:var(--faint);font-size:0.75rem;padding:6px 2px;">Nothing matched — use the extra-kcal box, or ask your coach for an estimate.</div>';
   box.querySelectorAll("[data-food]").forEach(b => b.addEventListener("click", () => {
     const f = FOODDB[+b.dataset.food];
-    const ki = document.getElementById("noteKcal");
-    ki.value = (+ki.value || 0) + f[2];
-    const nt = document.getElementById("noteText");
-    nt.value = (nt.value ? nt.value + " · " : "") + f[0] + " (" + f[1] + ")";
+    const st = noteTarget();
+    if (!st.items) st.items = [];
+    const ex = st.items.find(it => it.n === f[0]);
+    if (ex) ex.q++; else st.items.push({ n: f[0], q: 1 });
+    save(); renderItemChips();
     e.target.value = ""; box.innerHTML = "";
   }));
 });
