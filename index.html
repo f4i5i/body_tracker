@@ -476,6 +476,7 @@ pre.json { background: var(--srf2); border: 1px solid var(--edge); border-radius
       <div class="frow"><input id="medName" placeholder="Name (e.g. Metformin)" aria-label="Medicine name"></div>
       <div class="frow"><input id="medDose" placeholder="Dose label (e.g. 500 mg) — optional" aria-label="Dose label"></div>
       <div class="frow"><input id="medTimes" placeholder="Times, comma separated (e.g. 08:00, 20:00)" aria-label="Times"></div>
+      <div class="frow"><input id="medNote" placeholder="Instruction (optional) — e.g. khanay ke baad" aria-label="Instruction"></div>
       <button class="btn" id="medAdd">Add medicine</button>
     </div>
   </main>
@@ -1025,7 +1026,7 @@ function nodeHTML(it, d) {
     return '<div class="node meds ' + (taken ? "done" : "") + '" data-med="' + it.doseKey + '">' +
       '<button class="medal" aria-label="Mark ' + esc(it.med.name) + '">' + (taken ? IC.check : IC.pill) + '</button>' +
       '<div class="ncard"><div class="nrow"><span class="ntime">' + it.time + '</span><span class="ntitle">' + esc(it.med.name) + '</span></div>' +
-      '<div class="nsub">' + (it.med.dose ? esc(it.med.dose) + " · " : "") + (taken ? "taken" : "tap the capsule when taken") + '</div></div></div>';
+      '<div class="nsub">' + esc([it.med.dose, it.med.note].filter(Boolean).join(" · ")) + (it.med.dose || it.med.note ? " · " : "") + (taken ? "taken ✓" : "tap the capsule when taken") + '</div></div></div>';
   }
   if (it.type === "sugar") {
     const i = d.sugar.indexOf(it.r);
@@ -1486,6 +1487,26 @@ function LN() { return window.Capacitor && window.Capacitor.Plugins && window.Ca
 let alarmState = { env: "web", perm: "-", exact: "-", scheduled: 0, err: "" };
 async function ensureChannel(ln) {
   try { await ln.createChannel({ id: "meds", name: "Medicine alarms", description: "Daily medicine reminders", importance: 5, visibility: 1 }); } catch (e) {}
+  try {
+    await ln.registerActionTypes({ types: [{
+      id: "MEDDOSE",
+      actions: [
+        { id: "taken", title: "✓ Taken" },
+        { id: "snooze", title: "+15 min" }
+      ]
+    }] });
+  } catch (e) {}
+}
+function fmt12(t) {
+  const p = t.split(":"); let h = +p[0];
+  const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+  return h + ":" + p[1] + " " + ap;
+}
+function medNotifContent(m, t, di, total) {
+  return {
+    title: "💊 " + m.name + (m.dose ? " " + m.dose : "") + " — " + fmt12(t),
+    body: (m.note ? m.note + " · " : "") + "Dose " + (di + 1) + " of " + total + " today. Tap ✓ Taken to log it without opening the app."
+  };
 }
 async function syncMedAlarms() {
   const ln = LN(); if (!ln) { alarmState.env = "web"; return; }
@@ -1503,14 +1524,20 @@ async function syncMedAlarms() {
     if (pending.notifications && pending.notifications.length)
       await ln.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
     const notifs = []; let id = 1000;
-    for (const m of store.settings.meds) for (const t of m.times) {
-      const p = t.split(":");
-      notifs.push({
-        id: id++,
-        title: "Medicine — " + m.name,
-        body: (m.dose ? m.dose + " · " : "") + t + " dose. Tick it in BodyTrack when taken.",
-        channelId: "meds",
-        schedule: { on: { hour: +p[0], minute: +p[1] }, allowWhileIdle: true }
+    for (const m of store.settings.meds) {
+      const times = [...m.times].sort();
+      times.forEach((t, di) => {
+        const p = t.split(":");
+        const c = medNotifContent(m, t, di, times.length);
+        notifs.push({
+          id: id++,
+          title: c.title,
+          body: c.body,
+          channelId: "meds",
+          actionTypeId: "MEDDOSE",
+          extra: { medKey: m.id + "@" + t, medId: m.id, time: t },
+          schedule: { on: { hour: +p[0], minute: +p[1] }, allowWhileIdle: true }
+        });
       });
     }
     if (notifs.length) await ln.schedule({ notifications: notifs });
@@ -1561,7 +1588,7 @@ function renderMeds() {
   }
   el.innerHTML = store.settings.meds.map(m =>
     '<div class="card"><div class="medrow"><div style="flex:1;"><div class="mname">' + esc(m.name) + '</div>' +
-    (m.dose ? '<div class="mdose">' + esc(m.dose) + '</div>' : "") +
+    ((m.dose || m.note) ? '<div class="mdose">' + esc([m.dose, m.note].filter(Boolean).join(" · ")) + '</div>' : "") +
     '<div class="timechips">' + m.times.map(t => '<span class="timechip num">' + t + '</span>').join("") + '</div></div>' +
     '<button class="delbtn" data-delmed="' + m.id + '" aria-label="Remove ' + esc(m.name) + '">' + IC.x + '</button></div></div>'
   ).join("");
@@ -1574,11 +1601,12 @@ function renderMeds() {
 document.getElementById("medAdd").addEventListener("click", () => {
   const name = document.getElementById("medName").value.trim();
   const dose = document.getElementById("medDose").value.trim();
-  const times = document.getElementById("medTimes").value.split(",").map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).map(s => s.padStart(5, "0"));
+  const note = document.getElementById("medNote").value.trim();
+  const times = document.getElementById("medTimes").value.split(",").map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).map(s => s.padStart(5, "0")).sort();
   if (!name || !times.length) { toast("Need a name and at least one time like 08:00"); return; }
-  store.settings.meds.push({ id: "m" + Date.now(), name, dose, times });
+  store.settings.meds.push({ id: "m" + Date.now(), name, dose, times, note });
   save();
-  document.getElementById("medName").value = ""; document.getElementById("medDose").value = ""; document.getElementById("medTimes").value = "";
+  document.getElementById("medName").value = ""; document.getElementById("medDose").value = ""; document.getElementById("medTimes").value = ""; document.getElementById("medNote").value = "";
   renderMeds(); syncMedAlarms(); toast(LN() ? "Added — daily alarm set" : "Added — it's on today's spine");
 });
 
@@ -1779,6 +1807,36 @@ document.getElementById("themeBtn").addEventListener("click", () => {
 applyTheme();
 renderSpine();
 syncMedAlarms();
+/* notification action buttons: ✓ Taken logs the dose; +15 min snoozes */
+(function () {
+  const ln = LN(); if (!ln) return;
+  try {
+    ln.addListener("localNotificationActionPerformed", async e => {
+      const x = (e.notification && e.notification.extra) || {};
+      if (e.actionId === "taken" && x.medKey) {
+        day(todayKey()).meds[x.medKey] = true;
+        save();
+        if (viewDate === todayKey()) renderSpine();
+        toast("Dose logged ✓");
+      } else if (e.actionId === "snooze" && x.medId) {
+        const m = store.settings.meds.find(mm => mm.id === x.medId);
+        if (!m) return;
+        const times = [...m.times].sort();
+        const c = medNotifContent(m, x.time, Math.max(0, times.indexOf(x.time)), times.length);
+        try {
+          await ln.schedule({ notifications: [{
+            id: 8000 + (Date.now() % 1000),
+            title: c.title, body: "Snoozed · " + c.body,
+            channelId: "meds", actionTypeId: "MEDDOSE",
+            extra: x,
+            schedule: { at: new Date(Date.now() + 15 * 60000), allowWhileIdle: true }
+          }] });
+          toast("Snoozed 15 minutes");
+        } catch (err) {}
+      }
+    });
+  } catch (e) {}
+})();
 try { if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
 </script>
 </body>
