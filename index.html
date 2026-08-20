@@ -1124,6 +1124,7 @@ function bindSpine() {
   spineEl.querySelectorAll("[data-med] .medal").forEach(b => b.addEventListener("click", () => {
     const kk = b.closest("[data-med]").dataset.med;
     d.meds[kk] = !d.meds[kk]; save(); renderSpine();
+    syncMedAlarms();   // rebuild the escalation ladder taken-aware
   }));
   spineEl.querySelectorAll("[data-delsugar]").forEach(b => b.addEventListener("click", () => {
     d.sugar.splice(+b.dataset.delsugar, 1); save(); renderSpine();
@@ -1515,6 +1516,7 @@ function LN() { return window.Capacitor && window.Capacitor.Plugins && window.Ca
 let alarmState = { env: "web", perm: "-", exact: "-", scheduled: 0, err: "" };
 async function ensureChannel(ln) {
   try { await ln.createChannel({ id: "meds", name: "Medicine alarms", description: "Daily medicine reminders", importance: 5, visibility: 1 }); } catch (e) {}
+  try { await ln.createChannel({ id: "meds-urgent", name: "Missed medicine — RED ALERT", description: "Overdue dose escalation", importance: 5, visibility: 1, vibration: true, lights: true, lightColor: "#E2483D" }); } catch (e) {}
   try {
     await ln.registerActionTypes({ types: [{
       id: "MEDDOSE",
@@ -1551,25 +1553,49 @@ async function syncMedAlarms() {
     const pending = await ln.getPending();
     if (pending.notifications && pending.notifications.length)
       await ln.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
-    const notifs = []; let id = 1000;
+    const notifs = []; let id = 1000; let doseIdx = 0; let mains = 0;
+    const now = new Date();
     for (const m of store.settings.meds) {
       const times = [...m.times].sort();
       times.forEach((t, di) => {
         const p = t.split(":");
         const c = medNotifContent(m, t, di, times.length);
+        const medKey = m.id + "@" + t;
+        const fuBase = 20000 + doseIdx * 10;
         notifs.push({
           id: id++,
           title: c.title,
           body: c.body,
           channelId: "meds",
           actionTypeId: "MEDDOSE",
-          extra: { medKey: m.id + "@" + t, medId: m.id, time: t },
+          extra: { medKey, medId: m.id, time: t, fuBase },
           schedule: { on: { hour: +p[0], minute: +p[1] }, allowWhileIdle: true }
         });
+        mains++;
+        // escalation ladder for the NEXT occurrence: +15/+30 reminders, then red alerts
+        // +45/+65/+85 — all one-shots, rebuilt on every sync, cancelled the moment ✓ Taken
+        const occ = new Date(); occ.setHours(+p[0], +p[1], 0, 0);
+        const takenToday = !!day(todayKey()).meds[medKey];
+        if (occ <= now || takenToday) occ.setDate(occ.getDate() + 1);
+        [[15, "meds"], [30, "meds"], [45, "meds-urgent"], [65, "meds-urgent"], [85, "meds-urgent"]].forEach((fu, si) => {
+          const red = fu[1] === "meds-urgent";
+          notifs.push({
+            id: fuBase + si + 1,
+            title: red ? "🔴 OVERDUE " + fu[0] + " min — " + m.name + " " + fmt12(t)
+                       : "⏰ Reminder — " + m.name + (m.dose ? " " + m.dose : "") + " (" + fmt12(t) + " dose)",
+            body: red ? "Still not marked taken. Your sugar control depends on this dose — take it now and tap ✓ Taken."
+                      : (m.note ? m.note + " · " : "") + "Not marked taken yet. Tap ✓ Taken once you have.",
+            channelId: fu[1],
+            actionTypeId: "MEDDOSE",
+            extra: { medKey, medId: m.id, time: t, fuBase },
+            schedule: { at: new Date(occ.getTime() + fu[0] * 60000), allowWhileIdle: true }
+          });
+        });
+        doseIdx++;
       });
     }
     if (notifs.length) await ln.schedule({ notifications: notifs });
-    alarmState.scheduled = notifs.length;
+    alarmState.scheduled = mains;
   } catch (e) { alarmState.err = (e && e.message) || String(e); }
   renderAlarmStatus();
 }
@@ -1598,7 +1624,8 @@ function renderAlarmStatus() {
   if (alarmState.perm !== "granted")
     rows += '<button class="btn" id="alarmFix" style="margin-bottom:8px;">Enable notifications</button>' +
       '<p class="hint">If no popup appears: Android Settings → Apps → BodyTrack → Notifications → Allow.</p>';
-  rows += '<button class="btn ghost" id="alarmTest">Send test alarm (1 min)</button>' +
+  rows += '<p class="hint" style="margin:0 0 8px;">Each dose escalates until marked taken: alarm → reminders +15/+30 min → <b style="color:var(--blood-1);">red alerts</b> +45/+65/+85 min. ✓ Taken clears the whole chain.</p>' +
+    '<button class="btn ghost" id="alarmTest">Send test alarm (1 min)</button>' +
     '<p class="hint" style="margin-top:8px;"><b>Xiaomi/Redmi/Poco:</b> also needed once — Settings → Apps → Manage apps → BodyTrack → <b>Autostart ON</b> and Battery saver → <b>No restrictions</b>, otherwise MIUI kills alarms.</p>';
   el.innerHTML = '<div class="card">' + rows + '</div>';
   const fx = document.getElementById("alarmFix");
@@ -1874,8 +1901,11 @@ syncMedAlarms();
       if (e.actionId === "taken" && x.medKey) {
         day(todayKey()).meds[x.medKey] = true;
         save();
+        if (x.fuBase) {
+          try { await ln.cancel({ notifications: [1, 2, 3, 4, 5].map(s => ({ id: x.fuBase + s })) }); } catch (err) {}
+        }
         if (viewDate === todayKey()) renderSpine();
-        toast("Dose logged ✓");
+        toast("Dose logged ✓ — reminders cleared");
       } else if (e.actionId === "snooze" && x.medId) {
         const m = store.settings.meds.find(mm => mm.id === x.medId);
         if (!m) return;
