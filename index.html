@@ -1173,7 +1173,10 @@ document.getElementById("nextDay").addEventListener("click", () => { shiftDay(1)
 function shiftDay(n) {
   const dt = dateOf(viewDate); dt.setDate(dt.getDate() + n);
   if (dkey(dt) > todayKey()) return;
-  viewDate = dkey(dt); renderSpine();
+  viewDate = dkey(dt);
+  updateHeader();
+  const cur = document.querySelector("nav.tabs button.cur");
+  switchTab(cur ? cur.dataset.tab : "Today");
 }
 
 /* ============ tabs ============ */
