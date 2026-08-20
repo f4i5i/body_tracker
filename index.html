@@ -1480,7 +1480,7 @@ function logbookHTML() {
     const post = [...d.sugar].reverse().find(r => r.tag === "post-meal");
     const nsets = Object.values(d.workout.sets || {}).reduce((a, x) => a + x.length, 0);
     const medTotal = store.settings.meds.reduce((n, m) => n + m.times.length, 0);
-    const medDone = Object.keys(d.meds).filter(x => d.meds[x]).length;
+    const medDone = store.settings.meds.flatMap(m => m.times.map(t => m.id + "@" + t)).filter(k => d.meds[k]).length;
     h += '<button class="lbrow" data-day="' + k + '"><span class="lbdate">' + dt.getDate() + ' ' + MONTHS[dt.getMonth()] + '<small>' + DOWS[dt.getDay()].slice(0, 3) + '</small></span>' +
       '<span class="lbmid"><b>' + (d.workout.done ? (d.workout.session || "Workout") + (nsets ? " · " + nsets + " sets" : "") : "no workout") + '</b><br>' +
       (medTotal ? "meds " + medDone + "/" + medTotal + " · " : "") + "pf " + d.pf.filter(Boolean).length + "/3" + (d.protein ? " · protein ✓" : "") + '</span>' +
@@ -1675,7 +1675,7 @@ function exportDay(k) {
   const posts = d.sugar.filter(r => r.tag === "post-meal");
   const mealsOut = {}; for (const m of MEALS) mealsOut[m.id] = !!(d.meals[m.id] && d.meals[m.id].done);
   const medTotal = store.settings.meds.reduce((n, m) => n + m.times.length, 0);
-  const medDone = Object.keys(d.meds).filter(x => d.meds[x]).length;
+  const medDone = store.settings.meds.flatMap(m => m.times.map(t => m.id + "@" + t)).filter(k => d.meds[k]).length;
   const notes = MEALS.filter(m => d.meals[m.id] && d.meals[m.id].note).map(m => m.name + ": " + d.meals[m.id].note).join(" · ");
   return {
     date: k,
