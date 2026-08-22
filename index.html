@@ -854,6 +854,11 @@ const FIGS = {
   sideplank: fig(G + '<circle class="head" cx="74" cy="122" r="9"/><line class="limb" x1="86" y1="128" x2="188" y2="146"/><line class="limb" x1="96" y1="130" x2="92" y2="158"/><line class="guide" x1="68" y1="116" x2="196" y2="140"/>', 'Side plank: hips up, one straight line'),
   carry: fig(G + '<circle class="head" cx="130" cy="40" r="9"/><line class="limb" x1="130" y1="50" x2="128" y2="110"/><line class="limb" x1="128" y1="110" x2="120" y2="158"/><line class="limb" x1="128" y1="110" x2="138" y2="158"/><line class="limb" x1="129" y1="64" x2="112" y2="104"/><line class="limb" x1="129" y1="64" x2="146" y2="104"/><circle class="plate" cx="110" cy="111" r="7"/><circle class="plate" cx="148" cy="111" r="7"/><line class="guide" x1="130" y1="26" x2="130" y2="50"/>', 'Farmer\'s carry: walk tall, no leaning'),
   kneeraise: fig('<line class="bar" x1="60" y1="32" x2="200" y2="32"/><circle class="head" cx="128" cy="54" r="9"/><line class="limb" x1="116" y1="34" x2="121" y2="70"/><line class="limb" x1="121" y1="70" x2="126" y2="112"/><line class="limb" x1="126" y1="112" x2="150" y2="102"/><line class="limb" x1="150" y1="102" x2="147" y2="126"/><line class="guide" x1="126" y1="118" x2="152" y2="98"/>', 'Hanging knee raise: curl the pelvis at the top'),
+  walk: fig('<line class="thin" x1="40" y1="152" x2="210" y2="114"/><line class="thin" x1="40" y1="158" x2="210" y2="158"/><line class="thin" x1="210" y1="114" x2="210" y2="158"/><line class="thin" x1="40" y1="152" x2="40" y2="158"/><circle class="head" cx="128" cy="48" r="9"/><line class="limb" x1="127" y1="58" x2="124" y2="92"/><line class="limb" x1="124" y1="92" x2="146" y2="112"/><line class="limb" x1="146" y1="112" x2="150" y2="132"/><line class="limb" x1="124" y1="92" x2="106" y2="116"/><line class="limb" x1="106" y1="116" x2="100" y2="138"/><line class="limb" x1="126" y1="64" x2="140" y2="80"/><line class="limb" x1="126" y1="64" x2="112" y2="80"/><line class="guide" x1="70" y1="140" x2="190" y2="112"/>', 'Incline walk on a treadmill, brisk pace'),
+  seatedpress: fig(G + '<line class="thin" x1="100" y1="66" x2="100" y2="130"/><line class="thin" x1="100" y1="130" x2="142" y2="130"/><line class="thin" x1="108" y1="130" x2="108" y2="158"/><line class="thin" x1="136" y1="130" x2="136" y2="158"/><circle class="head" cx="126" cy="52" r="9"/><line class="limb" x1="123" y1="62" x2="120" y2="112"/><line class="limb" x1="120" y1="112" x2="150" y2="114"/><line class="limb" x1="150" y1="114" x2="150" y2="158"/><line class="limb" x1="122" y1="68" x2="138" y2="56"/><line class="limb" x1="138" y1="56" x2="138" y2="38"/><line class="limb" x1="122" y1="68" x2="106" y2="56"/><line class="limb" x1="106" y1="56" x2="106" y2="38"/><circle class="plate" cx="138" cy="33" r="5"/><circle class="plate" cx="106" cy="33" r="5"/><line class="guide" x1="122" y1="28" x2="122" y2="66"/>', 'Seated dumbbell shoulder press: back on the pad, DBs pressed overhead'),
+  inclinepress: fig(G + '<line class="thin" x1="72" y1="140" x2="150" y2="94"/><line class="thin" x1="108" y1="120" x2="108" y2="158"/><line class="thin" x1="140" y1="112" x2="140" y2="158"/><circle class="head" cx="157" cy="86" r="9"/><line class="limb" x1="146" y1="96" x2="102" y2="122"/><line class="limb" x1="102" y1="122" x2="92" y2="144"/><line class="limb" x1="92" y1="144" x2="92" y2="158"/><line class="limb" x1="140" y1="100" x2="152" y2="70"/><circle class="plate" cx="154" cy="64" r="6"/><line class="guide" x1="152" y1="60" x2="140" y2="100"/>', 'Incline dumbbell press on a 30-degree bench'),
+  splitsquat: fig(G + '<rect class="thin" x="150" y="118" width="42" height="8" rx="2"/><line class="thin" x1="158" y1="126" x2="158" y2="158"/><line class="thin" x1="184" y1="126" x2="184" y2="158"/><circle class="head" cx="110" cy="46" r="9"/><line class="limb" x1="108" y1="56" x2="105" y2="92"/><line class="limb" x1="105" y1="92" x2="126" y2="118"/><line class="limb" x1="126" y1="118" x2="126" y2="155"/><line class="limb" x1="105" y1="92" x2="132" y2="122"/><line class="limb" x1="132" y1="122" x2="156" y2="116"/><line class="limb" x1="107" y1="62" x2="98" y2="98"/><circle class="plate" cx="96" cy="104" r="5"/><line class="guide" x1="126" y1="112" x2="126" y2="155"/>', 'Bulgarian split squat: rear foot on the bench, front shin vertical'),
+  ohptri: fig(G + '<line class="thin" x1="168" y1="18" x2="168" y2="34"/><circle class="head" cx="122" cy="52" r="9"/><line class="limb" x1="119" y1="62" x2="115" y2="112"/><line class="limb" x1="115" y1="112" x2="108" y2="158"/><line class="limb" x1="115" y1="112" x2="124" y2="158"/><line class="limb" x1="119" y1="64" x2="126" y2="42"/><line class="limb" x1="126" y1="42" x2="146" y2="36"/><line class="bar" x1="142" y1="30" x2="152" y2="42"/><circle class="guide" cx="126" cy="42" r="6"/>', 'Overhead cable triceps extension: elbows up by the ears'),
   fly: fig(G + '<rect class="thin" x="55" y="116" width="120" height="8" rx="2"/><line class="thin" x1="70" y1="124" x2="70" y2="158"/><line class="thin" x1="160" y1="124" x2="160" y2="158"/><circle class="head" cx="72" cy="105" r="9"/><line class="limb" x1="83" y1="110" x2="140" y2="112"/><line class="limb" x1="140" y1="112" x2="168" y2="140"/><line class="limb" x1="98" y1="110" x2="76" y2="82"/><line class="limb" x1="100" y1="110" x2="128" y2="80"/><circle class="plate" cx="72" cy="78" r="6"/><circle class="plate" cx="132" cy="76" r="6"/><path class="guide" d="M76 74 Q102 58 130 72"/>', 'Fly: wide arc, like hugging a tree')
 };
 
@@ -861,9 +866,9 @@ const FIGS = {
 const EXDB = {
   "Upper A — push": [
     { n: "Barbell bench press", t: "4 × 6–8 · rest 2 min", f: "bench", tips: ["Shoulder blades pinched and pinned", "Elbows ~45°, bar to lower chest, forearms vertical"], warn: "No 90° elbow flare, no bouncing" },
-    { n: "Seated DB shoulder press", t: "3 × 8–10 · 90 s", f: "ohp", tips: ["Back flat on the pad", "Press until arms lock, DBs close at top"], warn: "Arching lower back = too heavy" },
+    { n: "Seated DB shoulder press", t: "3 × 8–10 · 90 s", f: "seatedpress", tips: ["Back flat on the pad", "Press until arms lock, DBs close at top"], warn: "Arching lower back = too heavy" },
     { n: "One-arm DB row", t: "3 × 10–12 each · 90 s", f: "row", tips: ["Pull to the hip, not the chest", "Squeeze the blade at the top"], warn: "No torso twist" },
-    { n: "Incline DB press", t: "3 × 10–12 · 90 s", f: "bench", tips: ["Bench at 30°", "DBs meet over the upper chest"], warn: "Not over the face" },
+    { n: "Incline DB press", t: "3 × 10–12 · 90 s", f: "inclinepress", tips: ["Bench at 30°", "DBs meet over the upper chest"], warn: "Not over the face" },
     { n: "Lateral raise", t: "3 × 12–15 · 60 s", f: "latraise", tips: ["Lead with the elbows", "Stop at shoulder height — light and strict"], warn: "No swinging from the hips" },
     { n: "Triceps rope pushdown", t: "3 × 12–15 · 60 s", f: "pushdown", tips: ["Elbows pinned to the sides", "Split the rope at the bottom"], warn: "Only the forearms move" }
   ],
@@ -873,18 +878,18 @@ const EXDB = {
     { n: "Walking lunge", t: "3 × 10 each leg · 90 s", f: "lunge", tips: ["Front shin vertical, sink straight down", "Torso tall, drive through front heel"], warn: "No short choppy steps" },
     { n: "Leg curl", t: "3 × 12–15 · 60 s", f: "legcurl", tips: ["2 s lowering every rep"], warn: "Hips stay on the pad" },
     { n: "Standing calf raise", t: "4 × 12–15 · 60 s", f: "calf", tips: ["2 s pause at the top", "Full stretch at the bottom"], warn: "No bouncing" },
-    { n: "Plank", t: "3 × 45 s · 45 s rest", f: "plank", tips: ["One line ear–hip–ankle", "Squeeze glutes, keep breathing"], warn: "No sagging hips" }
+    { n: "Plank", t: "3 × 45 s · 45 s rest", f: "plank", mode: "sec", tips: ["One line ear–hip–ankle", "Squeeze glutes, keep breathing"], warn: "No sagging hips" }
   ],
   "Pump day (optional)": [
     { n: "Cable fly", t: "3 × 12–15 · 60 s", f: "fly", tips: ["Big stretch, hard squeeze", "Slight elbow bend held constant"], warn: "No ego weight" },
     { n: "Cable row, light", t: "3 × 12–15 · 60 s", f: "row", tips: ["Squeeze the blades, slow tempo"], warn: "Stay strict — it's a pump day" },
     { n: "EZ-bar curl", t: "3 × 10–12 · 60 s", f: "curl", tips: ["Elbows at the sides", "Full lowering each rep"], warn: "No hip swing" },
-    { n: "Overhead cable triceps ext.", t: "3 × 10–12 · 60 s", f: "pushdown", tips: ["Elbows by the ears", "Deep stretch behind the head"], warn: "Elbows stay narrow" },
+    { n: "Overhead cable triceps ext.", t: "3 × 10–12 · 60 s", f: "ohptri", tips: ["Elbows by the ears", "Deep stretch behind the head"], warn: "Elbows stay narrow" },
     { n: "Cable lateral raise", t: "3 × 15 · 45 s", f: "latraise", tips: ["Constant tension — stop at shoulder height"], warn: "Light and controlled" },
     { n: "Reverse pec-deck", t: "3 × 15 · 45 s", f: "facepull", tips: ["Thumbs back, sweep wide", "Feel it between the blades"], warn: "No shrugging" }
   ],
   "Upper B — pull": [
-    { n: "Pull-up", t: "4 × 6–10 · rest 2 min", f: "pullup", tips: ["Dead hang at the bottom of every rep", "Elbows to back pockets, chest to bar", "Band assist is not cheating"], warn: "No kipping or swinging" },
+    { n: "Pull-up", t: "4 × 6–10 · rest 2 min", f: "pullup", mode: "reps", tips: ["Dead hang at the bottom of every rep", "Elbows to back pockets, chest to bar", "Band assist is not cheating"], warn: "No kipping or swinging" },
     { n: "Barbell row", t: "4 × 8–10 · 2 min", f: "row", tips: ["Hinge to ~45°, hold that angle all set", "Pull to the lower ribs"], warn: "Standing up to heave = lower back rowing" },
     { n: "Overhead press", t: "3 × 6–8 · 2 min", f: "ohp", tips: ["Glutes and core tight — body is a pillar", "Head through the window at lockout"], warn: "No leaning back" },
     { n: "Face pull", t: "3 × 15 · 60 s", f: "facepull", tips: ["Pull to the eyebrows, thumbs pointing back"], warn: "Light — it's posture medicine" },
@@ -894,17 +899,17 @@ const EXDB = {
   "Lower B — hinge": [
     { n: "Deadlift", t: "3 × 5 · rest 3 min", f: "deadlift", tips: ["Bar over midfoot, against the shins", "Flat back, chest up, take the slack out first", "Push the floor away"], warn: "Back rounds → the set ends there" },
     { n: "Front squat / leg press", t: "3 × 8–10 · 2 min", f: "squat", tips: ["Front squat: elbows high", "Leg press: lower back never curls off the pad"], warn: "Depth over weight" },
-    { n: "Bulgarian split squat", t: "3 × 8–10 each · 90 s", f: "lunge", tips: ["Front foot far enough forward", "Slight forward lean is fine"], warn: "Knee tracks over the toes" },
+    { n: "Bulgarian split squat", t: "3 × 8–10 each · 90 s", f: "splitsquat", tips: ["Front foot far enough forward", "Slight forward lean is fine"], warn: "Knee tracks over the toes" },
     { n: "Hip thrust", t: "3 × 12 · 90 s", f: "hipthrust", tips: ["Shins vertical at the top", "1 s squeeze at full lockout, chin tucked"], warn: "Don't arch the lower back for height" },
     { n: "Seated calf raise", t: "3 × 15 · 60 s", f: "calf", tips: ["Pause top and bottom"], warn: "No bouncing" },
-    { n: "Hanging knee raise", t: "3 × 12–15 · 60 s", f: "kneeraise", tips: ["Curl the pelvis up at the top — knees toward chest"], warn: "No swinging" }
+    { n: "Hanging knee raise", t: "3 × 12–15 · 60 s", f: "kneeraise", mode: "reps", tips: ["Curl the pelvis up at the top — knees toward chest"], warn: "No swinging" }
   ],
   "Conditioning + core": [
-    { n: "Incline walk / cycle", t: "6 min steady × 3 rounds", f: "carry", tips: ["Moderate pace — you can still talk"], warn: "Heart health, not exhaustion" },
+    { n: "Incline walk / cycle", t: "6 min steady × 3 rounds", f: "walk", mode: "min", tips: ["Moderate pace — you can still talk"], warn: "Heart health, not exhaustion" },
     { n: "Kettlebell swing", t: "15 reps × 3 rounds", f: "swing", tips: ["It's the RDL hinge with speed", "Snap the hips, arms just hold on"], warn: "Not a shoulder raise" },
-    { n: "Dead bug", t: "12 each side × 3 rounds", f: "deadbug", tips: ["Lower back pressed into the floor", "Opposite arm and leg, slow"], warn: "Stop if the back arches" },
-    { n: "Farmer's carry", t: "40 m × 3 rounds", f: "carry", tips: ["Walk tall like two full buckets", "Shoulders back"], warn: "No leaning" },
-    { n: "Side plank", t: "30 s each side × 3 rounds", f: "sideplank", tips: ["Hips high, one straight line"], warn: "Don't let the hip drop" }
+    { n: "Dead bug", t: "12 each side × 3 rounds", f: "deadbug", mode: "reps", tips: ["Lower back pressed into the floor", "Opposite arm and leg, slow"], warn: "Stop if the back arches" },
+    { n: "Farmer's carry", t: "40 m × 3 rounds", f: "carry", mode: "kgm", tips: ["Walk tall like two full buckets", "Shoulders back"], warn: "No leaning" },
+    { n: "Side plank", t: "30 s each side × 3 rounds", f: "sideplank", mode: "sec", tips: ["Hips high, one straight line"], warn: "Don't let the hip drop" }
   ]
 };
 
@@ -1196,6 +1201,20 @@ function switchTab(name) {
 document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
 
 /* ============ train screen ============ */
+function setLabel(st, mode) {
+  if (mode === "reps") return st.reps + " reps";
+  if (mode === "sec") return st.reps + " s";
+  if (mode === "min") return st.reps + " min";
+  if (mode === "kgm") return (st.kg ? st.kg + " kg × " : "") + st.reps + " m";
+  return (st.kg ? st.kg + " kg × " : "") + st.reps;
+}
+const MODE_FORM = {
+  kg:  { kg: "kg",  reps: "reps",    hint: "Enter the reps you did" },
+  kgm: { kg: "kg",  reps: "meters",  hint: "Enter the meters you carried" },
+  reps:{ kg: null,  reps: "reps",    hint: "Enter the reps you did" },
+  sec: { kg: null,  reps: "seconds", hint: "Enter the seconds you held" },
+  min: { kg: null,  reps: "minutes", hint: "Enter the minutes you did" }
+};
 function targetSets(t) {
   let m = t.match(/^(\d+)\s*×/);      // "4 × 6–8" → 4
   if (m) return +m[1];
@@ -1227,8 +1246,10 @@ function renderTrain() {
     const sets = d.workout.sets[ex.n] || [];
     const target = targetSets(ex.t);
     const complete = sets.length >= target;
+    const mode = ex.mode || "kg";
+    const mf = MODE_FORM[mode];
     const chips = sets.map((st, j) =>
-      '<span class="setchip num">' + (st.kg ? st.kg + " kg × " : "") + st.reps + '<button data-delset="' + i + ":" + j + '" aria-label="Remove set">' + IC.x + '</button></span>'
+      '<span class="setchip num">' + setLabel(st, mode) + '<button data-delset="' + i + ":" + j + '" aria-label="Remove set">' + IC.x + '</button></span>'
     ).join("");
     const last = sets[sets.length - 1] || {};
     html += '<div class="excard2 ' + (complete ? "complete" : sets.length ? "logged" : "") + '">' +
@@ -1240,9 +1261,9 @@ function renderTrain() {
       '<ul class="extips">' + ex.tips.map(t => "<li>" + t + "</li>").join("") +
       (ex.warn ? '<li class="warn">' + ex.warn + '</li>' : "") + '</ul></div></div>' +
       '<div class="setzone"><div class="setchips">' + chips + '</div>' +
-      '<div class="setform"><input type="number" inputmode="decimal" step="0.5" placeholder="kg" value="' + (last.kg || "") + '" data-kg="' + i + '" aria-label="Weight kg">' +
-      '<span class="x">×</span>' +
-      '<input type="number" inputmode="numeric" placeholder="reps" data-reps="' + i + '" aria-label="Reps">' +
+      '<div class="setform">' +
+      (mf.kg ? '<input type="number" inputmode="decimal" step="0.5" placeholder="' + mf.kg + '" value="' + (last.kg || "") + '" data-kg="' + i + '" aria-label="Weight kg"><span class="x">×</span>' : "") +
+      '<input type="number" inputmode="numeric" placeholder="' + mf.reps + '" data-reps="' + i + '" aria-label="' + mf.reps + '">' +
       '<button class="addset" data-addset="' + i + '" aria-label="Add set">+</button></div></div></div>';
   });
   el.innerHTML = html;
@@ -1250,9 +1271,10 @@ function renderTrain() {
   if (wt) wt.addEventListener("click", () => { d.workout.warmup = !d.workout.warmup; save(); renderTrain(); });
   el.querySelectorAll("[data-addset]").forEach(b => b.addEventListener("click", () => {
     const i = +b.dataset.addset; const ex = EXDB[s][i];
-    const kg = el.querySelector('[data-kg="' + i + '"]').value;
+    const kgEl = el.querySelector('[data-kg="' + i + '"]');
+    const kg = kgEl ? kgEl.value : "";
     const reps = el.querySelector('[data-reps="' + i + '"]').value;
-    if (!reps) { toast("Enter the reps (or seconds) you did"); return; }
+    if (!reps) { toast(MODE_FORM[ex.mode || "kg"].hint); return; }
     if (!d.workout.sets[ex.n]) d.workout.sets[ex.n] = [];
     d.workout.sets[ex.n].push({ kg: kg ? +kg : null, reps: +reps });
     d.workout.session = s;
